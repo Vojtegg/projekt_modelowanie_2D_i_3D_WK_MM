@@ -1,6 +1,5 @@
 import streamlit as st
 import numpy as np
-import matplotlib.subplots as plt  # Poprawka dla Streamlita
 import matplotlib.pyplot as plt
 import streamlit.components.v1 as components
 import folium
