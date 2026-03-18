@@ -14,56 +14,187 @@ from src import data_loader
 from src import terrain_3d
 # from src.pathfinder import find_optimal_path
 
-# --- KONFIGURACJA STRONY ---
-st.set_page_config(
-    page_title="Optymalizator Torów Wyścigowych 2D/3D",
-    page_icon="🏎️",
-    layout="wide"
-)
+# Konfiguracja strony
+st.set_page_config(page_title="Generator Torów F1", layout="wide")
 
-def main():
-    st.title("🏎️ System Analizy Przestrzennej: Lokalizacja Toru Wyścigowego")
-    st.markdown("""
-    Aplikacja służy do wielokryterialnej analizy przestrzennej. 
-    Łączy twarde wykluczenia 2D (zabudowa, wody, lasy ochronne) z analizą kosztów 3D (spadki terenu), 
-    aby znaleźć optymalną ścieżkę dla toru wyścigowego.
-    """)
+# 1. Inicjalizacja "pamięci" aplikacji (domyślnie startujemy na stronie głównej)
+if 'aktualna_strona' not in st.session_state:
+    st.session_state['aktualna_strona'] = 'Glowna'
+
+# ==========================================
+# PASEK BOCZNY (Nawigacja, Logo, Instrukcja, Autorzy)
+# ==========================================
+with st.sidebar:
+    # --- LOGO ---
+    try:
+        st.image("logo.jpg", use_container_width=True)
+    except:
+        st.warning("⚠️ Brak pliku 'logo.jpg' w folderze projektu.")
+        
+    st.title("📌 Menu Nawigacyjne")
+    
+    # --- PRZYCISKI NAWIGACJI ---
+    if st.button("🏠 Panel Główny (Narzędzia)", use_container_width=True):
+        st.session_state['aktualna_strona'] = 'Glowna'
+        st.rerun() 
+        
+    if st.button("ℹ️ Jak działa program", use_container_width=True):
+        st.session_state['aktualna_strona'] = 'Opis'
+        st.rerun()
+        
+    if st.button("🗺️ Interaktywna mapa torów F1", use_container_width=True):
+        st.session_state['aktualna_strona'] = 'Mapa'
+        st.rerun()
 
     st.markdown("---")
-    st.subheader("🌍 Interaktywna mapa torów F1 na sezon 2026")
+    
+    # --- INSTRUKCJA (Rozwijana) ---
+    with st.expander("📖 Jak używać aplikacji?"):
+        st.markdown("""
+        **Krok 1:** Przejdź do Panelu Głównego.
+        **Krok 2:** Wgraj pliki `.shp` / `.gpkg` oraz Numeryczny Model Terenu.
+        **Krok 3:** Dostosuj bufory i maksymalny spadek.
+        **Krok 4:** Kliknij *Uruchom analizę*.
+        """)
+    
+    # --- ŹRÓDŁA DANYCH (Rozwijana) - NOWE! ---
+    with st.expander("📥 Skąd pobrać dane?"):
+        st.markdown("""
+        Dane przestrzenne do analizy pobierzesz całkowicie za darmo z oficjalnych rejestrów:
+        
+        * **BDOT10k (Budynki, Wody):** [Geoportal.gov.pl](https://mapy.geoportal.gov.pl/) 
+            *(Wybierz z menu po prawej: POBIERANIE DANYCH -> Baza Danych Obiektów Topograficznych)*
+        * **NMT (Model Terenu 3D):** [Geoportal.gov.pl](https://mapy.geoportal.gov.pl/) 
+            *(Wybierz z menu po prawej: POBIERANIE DANYCH -> Numeryczny Model Terenu - polecamy format GeoTIFF)*
+        * **Corine Land Cover:** [Copernicus Land Monitoring](https://land.copernicus.eu/en/products/corine-land-cover) lub polski portal [GIOŚ](https://clc.gios.gov.pl/).
+        """)
 
-    # Tworzymy mapę bazową, wyśrodkowaną mniej więcej na Europę/Bliski Wschód
-    m = folium.Map(location=[30.0, 15.0], zoom_start=2)
+    st.markdown("---")
 
-    # Pełny kalendarz 24 wyścigów Formuły 1 na sezon 2026 (chronologicznie)
+    # --- INFO O AUTORACH ---
+    st.info("""
+    **O projekcie:**
+    Aplikacja do wielokryterialnej analizy przestrzennej, optymalizująca lokalizację torów wyścigowych z użyciem danych GIS.
+    
+    👨‍💻 **Autorzy i role:**
+    * **[Michał Medyński]** – Interfejs (Streamlit), analizy wektorowe 2D i maski wykluczeń.
+    * **[Wojtek Kobiela]** – Analiza wysokościowa 3D (NMT), fuzja danych i algorytmy tras.
+    """)
+
+# ==========================================
+# GŁÓWNA CZĘŚĆ EKRANU
+# ==========================================
+
+# --- PODSTRONA 1: PANEL GŁÓWNY ---
+if st.session_state['aktualna_strona'] == 'Glowna':
+    st.title("🏎️ Optymalizator Torów Wyścigowych")
+    st.markdown("Wgraj dane i ustaw parametry do analizy przestrzennej (2D & 3D).")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.header("📂 Wczytywanie Map")
+        bdot_file = st.file_uploader("Wgraj bazę BDOT10k (.gpkg, .shp, .zip)", key="bdot")
+        clc_file = st.file_uploader("Wgraj Corine Land Cover", key="clc")
+        nmt_file = st.file_uploader("Wgraj Numeryczny Model Terenu (NMT)", key="nmt")
+        
+    with col2:
+        st.header("⚙️ Parametry Analizy")
+        st.subheader("Wykluczenia 2D")
+        bufor_budynki = st.slider("Bufor od budynków mieszkalnych (m)", 0, 500, 100)
+        bufor_wody = st.slider("Bufor od wód powierzchniowych (m)", 0, 200, 50)
+        
+        st.subheader("Koszty 3D")
+        spadek_max = st.slider("Maksymalny spadek terenu (%)", 1, 20, 10)
+
+    st.markdown("---")
+    
+    # PRZYCISK ANALIZY
+    run_analysis = st.button("🚀 Uruchom analizę przestrzenną", use_container_width=True)
+
+    if run_analysis:
+        st.info("Rozpoczynam analizę danych... Proszę czekać.")
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        # TUTAJ WKLEJ SWÓJ STARY KOD OD ANALIZY PRZESTRZENNEJ
+        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        st.success("Analiza zakończona pomyślnie!")
+
+
+# --- PODSTRONA 2: JAK DZIAŁA PROGRAM ---
+elif st.session_state['aktualna_strona'] == 'Opis':
+    
+    # Nagłówek i przycisk powrotu (tak jak w mapie)
+    col_tytul, col_przycisk = st.columns([4, 1])
+    with col_tytul:
+        st.title("ℹ️ Metodologia badawcza i opisy analiz")
+    with col_przycisk:
+        st.write("") 
+        if st.button("⬅️ Wróć do Panelu", key="wroc_z_opisu"):
+            st.session_state['aktualna_strona'] = 'Glowna'
+            st.rerun()
+            
+    st.markdown("---")
+    
+    # Treść opisu
+    st.markdown("""
+    ### Cel projektu
+    Nasza aplikacja służy do wyznaczania optymalnych lokalizacji dla nowych torów Formuły 1 na podstawie danych przestrzennych (GIS). 
+    
+    ### Analiza 2D (Twarde wykluczenia)
+    Używamy bazy BDOT10k do odrzucenia terenów, na których budowa jest niemożliwa lub nieopłacalna. 
+    * **Budynki mieszkalne:** Tworzymy strefy buforowe, aby uniknąć hałasu.
+    * **Wody powierzchniowe:** Omijamy rzeki i jeziora, aby zminimalizować koszty inżynieryjne.
+    
+    ### Analiza 3D (Modelowanie spadków terenu)
+    Na podstawie Numerycznego Modelu Terenu (NMT) generujemy mapę spadków (Slope). 
+    * Upewniamy się, że maksymalne nachylenie toru nie przekracza dopuszczalnych norm wyścigowych.
+    """)
+
+
+# --- PODSTRONA 3: MAPA POGLĄDOWA ---
+elif st.session_state['aktualna_strona'] == 'Mapa':
+    
+    # Nagłówek i przycisk powrotu
+    col_tytul, col_przycisk = st.columns([4, 1])
+    with col_tytul:
+        st.title("🌍 Interaktywna mapa torów F1 na sezon 2026")
+    with col_przycisk:
+        st.write("") 
+        if st.button("⬅️ Wróć do Panelu", key="wroc_z_mapy"):
+            st.session_state['aktualna_strona'] = 'Glowna'
+            st.rerun()
+            
+    st.markdown("---") 
+    
+    m = folium.Map(location=[25.0, 10.0], zoom_start=2)
+
+    # TWOJA PEŁNA LISTA 24 TORÓW
     f1_tracks_2026 = {
-        "1. Melbourne (Australia)": [-37.8497, 144.9680],
-        "2. Szanghaj (Chiny)": [31.3389, 121.2200],
-        "3. Suzuka (Japonia)": [34.8431, 136.5390],
-        "4. Sakhir (Bahrajn)": [26.0325, 50.5106],
-        "5. Dżudda (Arabia Saudyjska)": [21.6319, 39.1044],
+        "1. Sakhir (Bahrajn)": [26.0325, 50.5106],
+        "2. Dżudda (Arabia Saudyjska)": [21.6319, 39.1044],
+        "3. Melbourne (Australia)": [-37.8497, 144.9680],
+        "4. Suzuka (Japonia)": [34.8431, 136.5410],
+        "5. Szanghaj (Chiny)": [31.3389, 121.2200],
         "6. Miami (USA)": [25.9581, -80.2389],
-        "7. Montreal (Kanada)": [45.5000, -73.5228],
+        "7. Imola (Włochy)": [44.3439, 11.7167],
         "8. Monte Carlo (Monako)": [43.7347, 7.4206],
-        "9. Barcelona (Hiszpania)": [41.5700, 2.2611],
-        "10. Spielberg (Austria)": [47.2197, 14.7647],
-        "11. Silverstone (Wielka Brytania)": [52.0786, -1.0169],
-        "12. Spa-Francorchamps (Belgia)": [50.4372, 5.9697],
-        "13. Budapeszt (Węgry)": [47.5800, 19.2486],
-        "14. Zandvoort (Holandia)": [52.3888, 4.5446],
-        "15. Monza (Włochy)": [45.6156, 9.2811],
-        "16. Madryt - IFEMA (Nowość 2026!)": [40.4660, -3.6160], 
+        "9. Montreal (Kanada)": [45.5000, -73.5228],
+        "10. Barcelona (Hiszpania)": [41.5700, 2.2611],
+        "11. Spielberg (Austria)": [47.2197, 14.7647],
+        "12. Silverstone (Wielka Brytania)": [52.0786, -1.0169],
+        "13. Budapeszt (Węgry)": [47.5822, 19.2486],
+        "14. Spa-Francorchamps (Belgia)": [50.4372, 5.9714],
+        "15. Zandvoort (Holandia)": [52.3888, 4.5409],
+        "16. Monza (Włochy)": [45.6156, 9.2811],
         "17. Baku (Azerbejdżan)": [40.3725, 49.8533],
-        "18. Marina Bay (Singapur)": [1.2914, 103.8640],
+        "18. Singapur (Singapur)": [1.2914, 103.8640],
         "19. Austin (USA)": [30.1328, -97.6411],
-        "20. Mexico City (Meksyk)": [19.4042, -99.0907],
-        "21. Interlagos (Brazylia)": [-23.7036, -46.6997],
+        "20. Meksyk (Meksyk)": [19.4042, -99.0907],
+        "21. Sao Paulo (Brazylia)": [-23.7036, -46.6997],
         "22. Las Vegas (USA)": [36.1147, -115.1728],
-        "23. Lusajl (Katar)": [25.4842, 51.4542],
+        "23. Lusail (Katar)": [25.4900, 51.4542],
         "24. Yas Marina (Abu Zabi)": [24.4672, 54.6031]
     }
 
-    # Nakładamy znaczniki na mapę
     for name, coords in f1_tracks_2026.items():
         folium.Marker(
             location=coords,
@@ -71,100 +202,4 @@ def main():
             icon=folium.Icon(color="red", icon="flag", prefix="fa")
         ).add_to(m)
 
-    # Wyświetlamy mapę w Streamlit
-    st_folium(m, use_container_width=True, height=800)
-
-    # --- PASEK BOCZNY (SIDEBAR) - PARAMETRY ---
-    st.sidebar.header("📂 Wczytywanie Map")
-    
-    st.sidebar.subheader("Dane 2D")
-    bdot_file = st.sidebar.file_uploader("Wgraj bazę BDOT10k (.gpkg, .shp)", type=['gpkg', 'shp', 'zip'])
-    clc_file = st.sidebar.file_uploader("Wgraj Corine Land Cover", type=['tif', 'gpkg', 'shp'])
-    
-    st.sidebar.subheader("Dane 3D")
-    nmt_file = st.sidebar.file_uploader("Wgraj Numeryczny Model Terenu (NMT)", type=['tif'])
-
-    st.sidebar.markdown("---")
-    st.sidebar.header("⚙️ Parametry Analizy")
-    
-    st.sidebar.subheader("Wykluczenia 2D")
-    buffer_distance = st.sidebar.slider("Bufor od zabudowy [m]", min_value=50, max_value=500, value=200, step=50)
-    exclude_water = st.sidebar.checkbox("Wyklucz tereny wodne", value=True)
-    exclude_forests = st.sidebar.checkbox("Wyklucz tereny leśne", value=True)
-    
-    st.sidebar.subheader("Parametry 3D (Twój silnik)")
-    max_slope = st.sidebar.slider("Maksymalny spadek terenu [%]", min_value=1.0, max_value=20.0, value=8.0, step=1.0)
-
-    st.sidebar.markdown("---")
-    run_analysis = st.sidebar.button("🚀 Uruchom Analizę", type="primary")
-
-    # --- GŁÓWNA LOGIKA APLIKACJI ---
-    if run_analysis:
-        with st.spinner("Przetwarzanie danych..."):
-            
-            # --- PODMIENIONE: KROK 1 ---
-            # Zamiast mockupu używamy Twojego data_loader'a
-            try:
-                elevation_matrix, metadata = data_loader.load_elevation_data('data/raw/DTM.tif')
-                st.info("Krok 1: Wczytywanie danych DTM (Zakończone)")
-                # Pobieramy prawdziwy rozmiar zamiast 100x100
-                grid_shape = elevation_matrix.shape
-            except Exception as e:
-                st.error(f"Nie udało się wczytać mapy: {e}")
-                st.stop()
-            
-            # KROK 2: Logika 2D
-            # Na potrzeby testów UI, generujemy losową maskę wykluczeń o prawdziwym rozmiarze mapy (0 - wolne, 1 - wykluczone)
-            exclusion_mask = np.random.choice([0, 1], size=grid_shape, p=[0.8, 0.2])
-            st.success("Krok 2: Wygenerowano twarde maski wykluczeń 2D")
-            
-            # --- PODMIENIONE: KROK 3 ---
-            # Zamiast losowych wartości używamy Twoich funkcji i przypisujemy wynik do zmiennej kolegi
-            slope_matrix = terrain_3d.calculate_slope(elevation_matrix)
-            cost_surface_3d = terrain_3d.score_topography(slope_matrix, optimal_slope=2.0, max_slope=max_slope)
-            st.success("Krok 3: Obliczono mapę kosztów 3D (spadki)")
-            
-            # KROK 4: Fuzja danych i Pathfinder (Działka kolegi)
-            # final_cost = np.where(exclusion_mask == 1, np.inf, cost_surface_3d)
-            # optimal_path = find_optimal_path(final_cost, start_point, end_point)
-            
-            st.success("Krok 4: Wyznaczono optymalną trasę!")
-
-            # --- WIZUALIZACJA ---
-            st.subheader("📊 Wyniki Analizy")
-            
-            # Tworzymy 3 kolumny do wyświetlenia poszczególnych etapów
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.markdown("**Wykluczenia 2D (Maska)**")
-                fig1, ax1 = plt.subplots()
-                ax1.imshow(exclusion_mask, cmap='Reds', interpolation='none')
-                ax1.set_title("Czerwone = Wykluczone")
-                ax1.axis('off')
-                st.pyplot(fig1)
-                
-            with col2:
-                st.markdown("**Koszty Terenu 3D**")
-                fig2, ax2 = plt.subplots()
-                im2 = ax2.imshow(cost_surface_3d, cmap='viridis')
-                ax2.set_title("Oceny terenu z silnika")
-                ax2.axis('off')
-                st.pyplot(fig2)
-                
-            with col3:
-                st.markdown("**Fuzja (Wynik końcowy)**")
-                # Łączymy maskę z kosztami dla wizualizacji: wykluczone miejsca są czarne
-                final_vis = np.copy(cost_surface_3d)
-                final_vis[exclusion_mask == 1] = np.nan 
-                
-                fig3, ax3 = plt.subplots()
-                # Kolory dla kosztów terenu + szare tło dla wykluczeń
-                ax3.set_facecolor('black')
-                ax3.imshow(final_vis, cmap='viridis')
-                ax3.set_title("Czarny = Teren niedostępny")
-                ax3.axis('off')
-                st.pyplot(fig3)
-
-if __name__ == "__main__":
-    main()
+    st_folium(m, use_container_width=True, height=1000)
