@@ -1,18 +1,15 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-import streamlit.components.v1 as components
 import folium
 from streamlit_folium import st_folium
+import os
 
-# Importy z Twoich modułów (Logika 2D)
-# Zakładamy, że filter_2d.py będzie miało funkcję generującą maskę wykluczeń
-# from src.filter_2d import generate_exclusion_mask
-
-# Importy z modułów kolegi (Logika 3D i algorytmy - na razie zakomentowane)
-# from src.data_loader import load_dem, load_bdot
-# from src.terrain_3d import calculate_slope_cost
-# from src.pathfinder import find_optimal_path
+# ==========================================
+# IMPORTY Z TWOICH MODUŁÓW (Logika 3D)
+# ==========================================
+from src import data_loader
+from src import terrain_3d
 
 # --- KONFIGURACJA STRONY ---
 st.set_page_config(
@@ -32,10 +29,10 @@ def main():
     st.markdown("---")
     st.subheader("🌍 Interaktywna mapa torów F1 na sezon 2026")
 
-    # Tworzymy mapę bazową, wyśrodkowaną mniej więcej na Europę/Bliski Wschód
+    # Tworzymy mapę bazową
     m = folium.Map(location=[30.0, 15.0], zoom_start=2)
 
-    # Pełny kalendarz 24 wyścigów Formuły 1 na sezon 2026 (chronologicznie)
+    # Kalendarz wyścigów
     f1_tracks_2026 = {
         "1. Melbourne (Australia)": [-37.8497, 144.9680],
         "2. Szanghaj (Chiny)": [31.3389, 121.2200],
@@ -63,7 +60,6 @@ def main():
         "24. Yas Marina (Abu Zabi)": [24.4672, 54.6031]
     }
 
-    # Nakładamy znaczniki na mapę
     for name, coords in f1_tracks_2026.items():
         folium.Marker(
             location=coords,
@@ -71,71 +67,57 @@ def main():
             icon=folium.Icon(color="red", icon="flag", prefix="fa")
         ).add_to(m)
 
-        st.set_page_config(page_title="Generator Torów F1", layout="wide")
-
     # Wyświetlamy mapę w Streamlit
-    st_folium(m, use_container_width=True, height=800)
+    st_folium(m, use_container_width=True, height=500)
 
     # --- PASEK BOCZNY (SIDEBAR) - PARAMETRY ---
-    st.sidebar.header("📂 Wczytywanie Map")
-    
-    st.sidebar.subheader("Dane 2D (Twój panel)")
-    bdot_file = st.sidebar.file_uploader("Wgraj bazę BDOT10k (.gpkg, .shp)", type=['gpkg', 'shp', 'zip'])
-    clc_file = st.sidebar.file_uploader("Wgraj Corine Land Cover", type=['tif', 'gpkg', 'shp'])
-    
-    st.sidebar.subheader("Dane 3D (Panel kolegi)")
-    nmt_file = st.sidebar.file_uploader("Wgraj Numeryczny Model Terenu (NMT)", type=['tif'])
-
-    st.sidebar.markdown("---")
     st.sidebar.header("⚙️ Parametry Analizy")
     
-    st.sidebar.subheader("Wykluczenia 2D (Twój panel)")
+    st.sidebar.subheader("Wykluczenia 2D")
     buffer_distance = st.sidebar.slider("Bufor od zabudowy [m]", min_value=50, max_value=500, value=200, step=50)
     exclude_water = st.sidebar.checkbox("Wyklucz tereny wodne", value=True)
     exclude_forests = st.sidebar.checkbox("Wyklucz tereny leśne", value=True)
     
-    st.sidebar.subheader("Parametry 3D (Panel kolegi)")
-    max_slope = st.sidebar.slider("Maksymalny spadek terenu [%]", min_value=1, max_value=20, value=8, step=1)
+    st.sidebar.subheader("Analiza 3D (Twój Silnik)")
+    # TUTAJ JEST ZMIENNA TWOJEGO KOLEGI:
+    max_slope = st.sidebar.slider("Maksymalny spadek terenu [%]", min_value=1.0, max_value=20.0, value=8.0, step=1.0)
 
     st.sidebar.markdown("---")
     run_analysis = st.sidebar.button("🚀 Uruchom Analizę", type="primary")
 
     # --- GŁÓWNA LOGIKA APLIKACJI ---
     if run_analysis:
-        with st.spinner("Przetwarzanie danych..."):
+        with st.spinner("Przetwarzanie prawdziwych danych przestrzennych..."):
             
-            # KROK 1: Wczytanie danych (Mockup)
-            # Tutaj będzie np.: dem_data, geo_transform = load_dem('data/raw/dem.tif')
-            st.info("Krok 1: Wczytywanie danych (Zakończone)")
+            # KROK 1: Wczytanie danych 3D (Twoja działka)
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            file_path = os.path.join(base_dir, "data", "raw", "DTM.tif")
             
-            # Symulacja rozmiaru rastra (np. 100x100 pikseli dla testów)
-            grid_shape = (100, 100)
+            try:
+                elevation_matrix, metadata = data_loader.load_elevation_data(file_path)
+                st.success("Krok 1: Wczytano prawdziwą mapę DTM!")
+            except Exception as e:
+                st.error(f"Nie znaleziono pliku DTM.tif w data/raw/. Błąd: {e}")
+                st.stop()
             
-            # KROK 2: Logika 2D (Twoja działka)
-            # Tutaj wywołasz swoją funkcję z src.filter_2d
-            # exclusion_mask = generate_exclusion_mask(bdot_data, grid_shape, buffer_distance, ...)
+            # Nasza siatka dopasowuje się do prawdziwej wielkości mapy
+            grid_shape = elevation_matrix.shape
             
-            # Na potrzeby testów UI, generujemy losową maskę wykluczeń (0 - wolne, 1 - wykluczone)
-            exclusion_mask = np.random.choice([0, 1], size=grid_shape, p=[0.8, 0.2])
+            # KROK 2: Logika 2D (Działka kolegi - na razie losowa symulacja)
+            # Pamiętajmy, że 0 - wolne, 1 - wykluczone
+            exclusion_mask = np.random.choice([0, 1], size=grid_shape, p=[0.9, 0.1])
             st.success("Krok 2: Wygenerowano twarde maski wykluczeń 2D")
             
-            # KROK 3: Logika 3D (Działka kolegi)
-            # cost_surface_3d = calculate_slope_cost(dem_data, max_slope)
+            # KROK 3: Logika 3D (TWOJA DZIAŁKA - Prawdziwe obliczenia)
+            # Używamy Twoich funkcji i zmiennej 'max_slope' ze slidera!
+            slope_matrix = terrain_3d.calculate_slope(elevation_matrix, cell_size=1.0)
+            score_matrix = terrain_3d.score_topography(slope_matrix, optimal_slope=2.0, max_slope=max_slope)
+            st.success(f"Krok 3: Obliczono ocenę terenu (max dopuszczalny spadek: {max_slope}%)")
             
-            # Symulacja mapy kosztów 3D (wartości od 1 do 10)
-            cost_surface_3d = np.random.uniform(1, 10, size=grid_shape)
-            st.success("Krok 3: Obliczono mapę kosztów 3D (spadki)")
-            
-            # KROK 4: Fuzja danych i Pathfinder (Działka kolegi)
-            # final_cost = np.where(exclusion_mask == 1, np.inf, cost_surface_3d)
-            # optimal_path = find_optimal_path(final_cost, start_point, end_point)
-            
-            st.success("Krok 4: Wyznaczono optymalną trasę!")
+            st.success("Krok 4: Wyznaczono optymalną trasę! (Przygotowanie pod algorytm ścieżki)")
 
             # --- WIZUALIZACJA ---
             st.subheader("📊 Wyniki Analizy")
-            
-            # Tworzymy 3 kolumny do wyświetlenia poszczególnych etapów
             col1, col2, col3 = st.columns(3)
             
             with col1:
@@ -147,24 +129,25 @@ def main():
                 st.pyplot(fig1)
                 
             with col2:
-                st.markdown("**Koszty Terenu 3D**")
+                # Zmienione na TWOJĄ paletę (Zielone = Dobrze, Czerwone = Źle)
+                st.markdown("**Przydatność Terenu 3D**")
                 fig2, ax2 = plt.subplots()
-                im2 = ax2.imshow(cost_surface_3d, cmap='viridis')
-                ax2.set_title("Żółte = Wysoki koszt")
+                im2 = ax2.imshow(score_matrix, cmap='RdYlGn')
+                ax2.set_title("1.0 (Zielony) = Idealnie płasko")
                 ax2.axis('off')
                 st.pyplot(fig2)
                 
             with col3:
                 st.markdown("**Fuzja (Wynik końcowy)**")
-                # Łączymy maskę z kosztami dla wizualizacji: wykluczone miejsca są czarne
-                final_vis = np.copy(cost_surface_3d)
+                # Kopiujemy Twoją mapę ocen, ale w miejscach wykluczeń 2D (budynki) wstawiamy NaN (brak danych)
+                final_vis = np.copy(score_matrix)
                 final_vis[exclusion_mask == 1] = np.nan 
                 
                 fig3, ax3 = plt.subplots()
-                # Kolory dla kosztów terenu + szare tło dla wykluczeń
                 ax3.set_facecolor('black')
-                ax3.imshow(final_vis, cmap='viridis')
-                ax3.set_title("Czary = Teren niedostępny")
+                # Używamy RdYlGn, żeby było widać, gdzie jest płasko, a na czarno znikną budynki/rzeki
+                ax3.imshow(final_vis, cmap='RdYlGn')
+                ax3.set_title("Czarny = Budynki/Woda")
                 ax3.axis('off')
                 st.pyplot(fig3)
 
