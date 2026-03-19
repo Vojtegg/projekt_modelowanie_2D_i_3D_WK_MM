@@ -89,6 +89,8 @@ with st.sidebar:
 if st.session_state['aktualna_strona'] == 'Glowna':
     st.title("🏎️ Optymalizator Torów Wyścigowych")
     st.markdown("Wgraj dane i ustaw parametry do analizy przestrzennej (2D & 3D).")
+
+    st.markdown("---")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -106,8 +108,10 @@ if st.session_state['aktualna_strona'] == 'Glowna':
         st.subheader("Koszty 3D")
         spadek_max = st.slider("Maksymalny spadek terenu (%)", 1, 20, 10)
 
-    st.markdown("---")
-    
+        st.markdown("**Opcje zaawansowane**")
+        wycinka_lasow = st.checkbox("🌲 Zezwalaj na wycinkę lasów")
+        budowa_mostow = st.checkbox("🌉 Uwzględnij budowę mostów")
+   
     # PRZYCISK ANALIZY
     run_analysis = st.button("🚀 Uruchom analizę przestrzenną", use_container_width=True)
 
