@@ -1,67 +1,182 @@
 import os
 import rasterio
 import numpy as np
+import tempfile
+import zipfile
+import shutil
+import geopandas as gpd
+import pandas as pd
+import streamlit as st
 
 def load_elevation_data(file_path):
-    """
-    Wczytuje Numeryczny Model Terenu (DEM) z pliku GeoTIFF.
-    
-    Zasada czarnej skrzynki: Funkcja przyjmuje ścieżkę do pliku, 
-    a zwraca czystą macierz numpy (wysokości w metrach) oraz metadane 
-    potrzebne do ewentualnego nałożenia na mapę.
-    
-    Parametry:
-    file_path (str): Ścieżka do pliku .tif z modelem terenu.
-    
-    Zwraca:
-    tuple: (elevation_matrix, metadata)
-           elevation_matrix - dwuwymiarowa macierz numpy z wysokościami
-           metadata - słownik z informacjami przestrzennymi (CRS, transform)
-    """
-    
-    # Sprawdzenie, czy plik w ogóle istnieje
+    """(Oryginalna funkcja do testów offline z Twojego kodu)"""
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"❌ BŁĄD: Nie znaleziono pliku pod ścieżką: {file_path}")
-        
-    print(f"Baza: Rozpoczynam wczytywanie pliku: {file_path}...")
-    
     with rasterio.open(file_path) as dataset:
-        # Odczytujemy pierwszą "warstwę" (band 1), bo DEM to obraz w skali szarości
         elevation_matrix = dataset.read(1)
-        
-        # Pobieramy metadane (georeferencje, rozdzielczość piksela)
         metadata = dataset.profile
-        
-        # Opcjonalne: Czyszczenie danych (NoData)
-        # Zdarza się, że tło mapy ma wartość np. -9999. Zamieniamy to na "Not a Number" (NaN),
-        # żeby nie popsuło nam później obliczania spadków (matematyki).
         nodata_value = dataset.nodata
         if nodata_value is not None:
-            # Konwersja na float, aby móc użyć np.nan
             elevation_matrix = elevation_matrix.astype(np.float32)
             elevation_matrix[elevation_matrix == nodata_value] = np.nan
-            
-    print(f"✅ Sukces! Wczytano macierz o wymiarach: {elevation_matrix.shape}")
-    
     return elevation_matrix, metadata
 
-# ==========================================
-# SEKCJA TESTOWA (Uruchomi się tylko, gdy odpalisz ten plik bezpośrednio)
-# ==========================================
-if __name__ == "__main__":
-    
-    # 1. Pobieramy absolutną ścieżkę do folderu, w którym jest ten skrypt (czyli do folderu 'src')
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    
-    # 2. Budujemy bezpieczną ścieżkę: z 'src' cofamy się o poziom wyżej (".."), wchodzimy do 'data', potem do 'raw' i szukamy pliku.
-    test_file = os.path.join(BASE_DIR, "..", "data", "raw", "DTM.tif")
-    
-    print(f"🔧 System szuka pliku dokładnie tutaj:\n{test_file}\n")
+def wczytaj_raster_z_uploadu(uploaded_file):
+    """
+    NOWA WERSJA: Automatycznie radzi sobie z plikami NMT z Geoportalu.
+    Rozpakowuje pliki .zip i szuka w nich modeli .tif lub .asc.
+    """
+    if uploaded_file is None:
+        return None, None, None
+        
+    nazwa_pliku = uploaded_file.name
+    temp_dir = tempfile.mkdtemp()
     
     try:
-        macierz, meta = load_elevation_data(test_file)
-        print("\nPróbka danych (lewy górny róg 3x3 piksele):")
-        print(macierz[:3, :3])
-    except FileNotFoundError as e:
-        print("❌ Nie znaleziono pliku!")
-        print("Upewnij się, że wrzuciłeś plik 'DTM.tif' do folderu 'data/raw/'!")
+        temp_file_path = os.path.join(temp_dir, nazwa_pliku)
+        with open(temp_file_path, "wb") as f:
+            f.write(uploaded_file.getvalue())
+
+        plik_do_otwarcia = temp_file_path
+
+        # Jeśli wgrano ZIP (Geoportal niemal zawsze pakuje w ZIP)
+        if nazwa_pliku.lower().endswith('.zip'):
+            with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+            
+            znaleziony_raster = None
+            # Przeszukujemy rozpakowane pliki w poszukiwaniu TIF lub ASC
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    if file.lower().endswith(('.tif', '.tiff', '.asc')):
+                        znaleziony_raster = os.path.join(root, file)
+                        break
+                if znaleziony_raster:
+                    break
+                    
+            if znaleziony_raster:
+                plik_do_otwarcia = znaleziony_raster
+            else:
+                st.error("❌ W wgranej paczce ZIP nie znaleziono żadnego modelu wysokości (brak pliku .tif lub .asc)!")
+                return None, None, None
+
+        # Otwieramy prawdziwy raster
+        with rasterio.open(plik_do_otwarcia) as src:
+            macierz_wysokosci = src.read(1)  
+            transform = src.transform  
+            crs = src.crs   
+            nodata = src.nodata
+            
+            macierz_wysokosci = macierz_wysokosci.astype(np.float32)
+            
+            # Usuwamy wartości puste/NoData z Geoportalu
+            if nodata is not None:
+                macierz_wysokosci[macierz_wysokosci == nodata] = np.nan
+            # Zabezpieczenie przed tzw. "dziurami" (Geoportal czasem wstawia -9999 jako nodata w plikach .asc)
+            macierz_wysokosci[macierz_wysokosci < -100] = np.nan 
+
+        return macierz_wysokosci, transform, crs
+        
+    except Exception as e:
+        st.error(f"❌ Błąd podczas otwierania pliku NMT: {e}")
+        return None, None, None
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+def _bezpieczny_odczyt_wektora(sciezka):
+    """Bezpiecznie wczytuje warstwy BDOT (ignoruje puste pliki w których nie ma poligonów)."""
+    try:
+        gdf = gpd.read_file(sciezka)
+        if gdf.empty:
+            return None
+        return gdf
+    except Exception:
+        return None
+
+def wczytaj_wektor_z_uploadu(uploaded_file, slowo_kluczowe=None):
+    if uploaded_file is None:
+        return None
+        
+    nazwa_pliku = uploaded_file.name
+    rozszerzenie = os.path.splitext(nazwa_pliku)[1].lower()
+    temp_dir = tempfile.mkdtemp()
+    
+    try:
+        temp_file_path = os.path.join(temp_dir, nazwa_pliku)
+        with open(temp_file_path, "wb") as f:
+            f.write(uploaded_file.getvalue())
+
+        if rozszerzenie == '.zip':
+            with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+            
+            znaleziony_plik = None
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    if file.lower().endswith(('.shp', '.gpkg')):
+                        if slowo_kluczowe:
+                            if slowo_kluczowe.lower() in file.lower():
+                                znaleziony_plik = os.path.join(root, file)
+                                break
+                        else:
+                            znaleziony_plik = os.path.join(root, file)
+                            break
+                if znaleziony_plik:
+                    break
+                    
+            if znaleziony_plik:
+                return _bezpieczny_odczyt_wektora(znaleziony_plik)
+            else:
+                return None
+                
+        elif rozszerzenie in ['.gpkg', '.shp']:
+            return _bezpieczny_odczyt_wektora(temp_file_path)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+def wczytaj_wszystkie_warstwy_bdot(uploaded_file):
+    if uploaded_file is None:
+        return None
+        
+    nazwa_pliku = uploaded_file.name
+    temp_dir = tempfile.mkdtemp()
+    
+    wyniki = {'budynki': None, 'rekreacja': [], 'wody': None, 'jezdnie': None, 'tory': None}
+    
+    try:
+        temp_file_path = os.path.join(temp_dir, nazwa_pliku)
+        with open(temp_file_path, "wb") as f:
+            f.write(uploaded_file.getvalue())
+
+        if nazwa_pliku.lower().endswith('.zip'):
+            with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+            
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    if file.lower().endswith(('.shp', '.gpkg')):
+                        file_lower = file.lower()
+                        sciezka = os.path.join(root, file)
+                        
+                        if 'bubd' in file_lower:
+                            wyniki['budynki'] = _bezpieczny_odczyt_wektora(sciezka)
+                        elif any(x in file_lower for x in ['ptzb', 'kusk', 'ptut']):
+                            gdf = _bezpieczny_odczyt_wektora(sciezka)
+                            if gdf is not None:
+                                wyniki['rekreacja'].append(gdf)
+                        elif 'ptwp' in file_lower:
+                            wyniki['wody'] = _bezpieczny_odczyt_wektora(sciezka)
+                        elif 'skjz' in file_lower:
+                            wyniki['jezdnie'] = _bezpieczny_odczyt_wektora(sciezka)
+                        elif 'sktr' in file_lower:
+                            wyniki['tory'] = _bezpieczny_odczyt_wektora(sciezka)
+                            
+            if wyniki['rekreacja']:
+                wyniki['rekreacja'] = gpd.GeoDataFrame(pd.concat(wyniki['rekreacja'], ignore_index=True))
+            else:
+                wyniki['rekreacja'] = None
+                
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        
+    return wyniki
