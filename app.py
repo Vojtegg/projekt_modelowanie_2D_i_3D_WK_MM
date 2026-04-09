@@ -1,18 +1,110 @@
 import streamlit as st
-import numpy as np
-import matplotlib.pyplot as plt
-import streamlit.components.v1 as components
+import geopandas as gpd
+import os
+import tempfile
+import zipfile  
+import shutil    
 import folium
 from streamlit_folium import st_folium
 
-# Importy z Twoich modułów (Logika 2D)
-# Zakładamy, że filter_2d.py będzie miało funkcję generującą maskę wykluczeń
-# from src.filter_2d import generate_exclusion_mask
+# --- IMPORT TWOJEGO MODUŁU 2D ---
+from src import filter_2d
 
-# --- PODMIENIONE: Importy z Twoich modułów (Logika 3D) ---
-from src import data_loader
-from src import terrain_3d
-# from src.pathfinder import find_optimal_path
+# ==========================================
+# UNIWERSALNE FUNKCJE ŁADUJĄCE DANE (OBSŁUGA .ZIP)
+# ==========================================
+
+def wczytaj_wektor_z_uploadu(uploaded_file):
+    """
+    Sprytna funkcja do ładowania wektorów (BDOT10k, CLC).
+    Obsługuje zarówno czyste pliki (.shp, .gpkg) jak i paczki .zip.
+    """
+    if uploaded_file is None:
+        return None
+        
+    nazwa_pliku = uploaded_file.name
+    rozszerzenie = os.path.splitext(nazwa_pliku)[1].lower()
+    
+    # Tworzymy ukryty folder na dysku
+    temp_dir = tempfile.mkdtemp()
+    
+    try:
+        # Zapisujemy to, co wrzucił użytkownik
+        temp_file_path = os.path.join(temp_dir, nazwa_pliku)
+        with open(temp_file_path, "wb") as f:
+            f.write(uploaded_file.getvalue())
+
+        # JEŚLI TO ZIP: Wypakuj i poszukaj SHP lub GPKG
+        if rozszerzenie == '.zip':
+            with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+            
+            # Przeszukujemy wypakowane pliki
+            znaleziony_plik = None
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    if file.lower().endswith(('.shp', '.gpkg')):
+                        znaleziony_plik = os.path.join(root, file)
+                        break # Znaleziono, przerywamy pętlę
+                if znaleziony_plik:
+                    break
+                    
+            if znaleziony_plik:
+                return gpd.read_file(znaleziony_plik)
+            else:
+                st.error(f"❌ W paczce {nazwa_pliku} nie znaleziono żadnego pliku .shp ani .gpkg!")
+                return None
+                
+        # JEŚLI TO ZWYKŁY PLIK: Czytaj od razu
+        elif rozszerzenie in ['.gpkg', '.shp']:
+            return gpd.read_file(temp_file_path)
+
+    finally:
+        # Zawsze na koniec (niezależnie od błędów) kasujemy folder!
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+def wczytaj_raster_z_uploadu(uploaded_file):
+    """
+    Sprytna funkcja do ładowania NMT (Model Terenu).
+    Wyszukuje pliki .tif wewnątrz paczek .zip i przekazuje do modułu data_loader.
+    """
+    if uploaded_file is None:
+        return None, None
+        
+    nazwa_pliku = uploaded_file.name
+    rozszerzenie = os.path.splitext(nazwa_pliku)[1].lower()
+    temp_dir = tempfile.mkdtemp()
+    
+    try:
+        temp_file_path = os.path.join(temp_dir, nazwa_pliku)
+        with open(temp_file_path, "wb") as f:
+            f.write(uploaded_file.getvalue())
+            
+        if rozszerzenie == '.zip':
+            with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
+                zip_ref.extractall(temp_dir)
+                
+            znaleziony_plik = None
+            for root, dirs, files in os.walk(temp_dir):
+                for file in files:
+                    if file.lower().endswith(('.tif', '.tiff')):
+                        znaleziony_plik = os.path.join(root, file)
+                        break
+                if znaleziony_plik:
+                    break
+                    
+            if znaleziony_plik:
+                # Używamy funkcji z pliku data_loader.py!
+                return data_loader.load_elevation_data(znaleziony_plik)
+            else:
+                st.error(f"❌ W paczce {nazwa_pliku} nie znaleziono pliku .tif z modelem terenu!")
+                return None, None
+                
+        elif rozszerzenie in ['.tif', '.tiff']:
+            return data_loader.load_elevation_data(temp_file_path)
+            
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
 # Konfiguracja strony
 st.set_page_config(page_title="Generator Torów F1", layout="wide")
@@ -113,15 +205,55 @@ if st.session_state['aktualna_strona'] == 'Glowna':
         budowa_mostow = st.checkbox("Uwzględnij budowę mostów")
    
     # PRZYCISK ANALIZY
-    run_analysis = st.button("Uruchom analizę przestrzenną", use_container_width=True)
+    run_analysis = st.button("🚀 Uruchom analizę przestrzenną", use_container_width=True)
 
     if run_analysis:
-        st.info("Rozpoczynam analizę danych... Proszę czekać.")
-        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # TUTAJ WKLEJ SWÓJ STARY KOD OD ANALIZY PRZESTRZENNEJ
-        # !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        st.success("Analiza zakończona pomyślnie!")
+        # Sprawdzamy, czy użytkownik wgrał chociaż podstawowe pliki 2D
+        if bdot_file is None or clc_file is None:
+            st.error("⚠️ Proszę wgrać pliki BDOT10k oraz Corine Land Cover (najlepiej w formacie .zip) przed uruchomieniem analizy!")
+        else:
+            st.info("Rozpoczynam analizę danych... Proszę czekać.")
+            
+           # --- ETAP 1: ANALIZA 2D ---
+            with st.spinner("Rozpakowywanie i wczytywanie map wektorowych (BDOT i CLC)..."):
+                # 1. BUDYNKI (Kod: BUBD)
+                budynki_gdf = wczytaj_wektor_z_uploadu(bdot_file, slowo_kluczowe="BUBD")
+                if budynki_gdf is not None: budynki_gdf['klasa'] = 'budynek'
+                
+                # 2. TERENY REKREACYJNE (Kody: PTZB, KUSK, PTUT)
+                ptzb_gdf = wczytaj_wektor_z_uploadu(bdot_file, slowo_kluczowe="PTZB")
+                kusk_gdf = wczytaj_wektor_z_uploadu(bdot_file, slowo_kluczowe="KUSK")
+                ptut_gdf = wczytaj_wektor_z_uploadu(bdot_file, slowo_kluczowe="PTUT")
+                
+                rekreacja_list = [df for df in [ptzb_gdf, kusk_gdf, ptut_gdf] if df is not None]
+                if rekreacja_list:
+                    rekreacja_gdf = gpd.GeoDataFrame(pd.concat(rekreacja_list, ignore_index=True))
+                    rekreacja_gdf['klasa'] = 'rekreacja'
+                else:
+                    rekreacja_gdf = None
 
+                # 3. WODY (Kod: PTWP)
+                wody_gdf = wczytaj_wektor_z_uploadu(bdot_file, slowo_kluczowe="PTWP")
+                if wody_gdf is not None: wody_gdf['klasa'] = 'woda'
+                
+                # 4. DROGI I TORY (Kody: SKJZ, SKTR - Wykluczenia automatyczne)
+                jezdnie_gdf = wczytaj_wektor_z_uploadu(bdot_file, slowo_kluczowe="SKJZ")
+                if jezdnie_gdf is not None: jezdnie_gdf['klasa'] = 'jezdnia'
+                
+                tory_gdf = wczytaj_wektor_z_uploadu(bdot_file, slowo_kluczowe="SKTR")
+                if tory_gdf is not None: tory_gdf['klasa'] = 'tor'
+                
+                # Sklejamy wszystko do jednego obiektu bdot_gdf
+                wszystkie_warstwy = [budynki_gdf, rekreacja_gdf, wody_gdf, jezdnie_gdf, tory_gdf]
+                bdot_obiekty = [df for df in wszystkie_warstwy if df is not None and not df.empty]
+                
+                if bdot_obiekty:
+                    bdot_gdf = gpd.GeoDataFrame(pd.concat(bdot_obiekty, ignore_index=True))
+                else:
+                    bdot_gdf = None
+
+                # Wczytanie CLC (bez zmian)
+                clc_gdf = wczytaj_wektor_z_uploadu(clc_file)
 
 # --- PODSTRONA 2: JAK DZIAŁA PROGRAM ---
 elif st.session_state['aktualna_strona'] == 'Opis':
@@ -207,3 +339,4 @@ elif st.session_state['aktualna_strona'] == 'Mapa':
         ).add_to(m)
 
     st_folium(m, use_container_width=True, height=1000)
+
