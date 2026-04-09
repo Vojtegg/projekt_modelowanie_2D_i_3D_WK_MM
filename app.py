@@ -16,25 +16,11 @@ from src import filter_2d
 # ==========================================
 st.set_page_config(page_title="Generator Torów F1", layout="wide")
 
-# ==========================================
-# LOGIKA NAWIGACJI (Synchronizacja Radio z Przyciskami)
-# ==========================================
-opcje_menu = ["🏠 Panel Główny (Narzędzia)", "ℹ️ Jak działa program", "🗺️ Interaktywna mapa torów F1"]
-mapowanie_stron = {
-    "🏠 Panel Główny (Narzędzia)": "Glowna",
-    "ℹ️ Jak działa program": "Opis",
-    "🗺️ Interaktywna mapa torów F1": "Mapa"
-}
-odwrotne_mapowanie = {v: k for k, v in mapowanie_stron.items()}
-
 if 'aktualna_strona' not in st.session_state:
     st.session_state['aktualna_strona'] = 'Glowna'
 
-def zmien_strone_z_radio():
-    st.session_state['aktualna_strona'] = mapowanie_stron[st.session_state['radio_nawigacja']]
-
 # ==========================================
-# PASEK BOCZNY
+# PASEK BOCZNY (Tylko duże, czyste przyciski!)
 # ==========================================
 with st.sidebar:
     try:
@@ -44,14 +30,18 @@ with st.sidebar:
         
     st.title("📌 Menu Nawigacyjne")
     
-    st.radio(
-        "Nawigacja",
-        options=opcje_menu,
-        index=opcje_menu.index(odwrotne_mapowanie[st.session_state['aktualna_strona']]),
-        key='radio_nawigacja',
-        on_change=zmien_strone_z_radio,
-        label_visibility="collapsed"
-    )
+    # --- PRZYCISKI NAWIGACJI ---
+    if st.button("🏠 Panel Główny (Narzędzia)", use_container_width=True):
+        st.session_state['aktualna_strona'] = 'Glowna'
+        st.rerun() 
+        
+    if st.button("ℹ️ Jak działa program", use_container_width=True):
+        st.session_state['aktualna_strona'] = 'Opis'
+        st.rerun()
+        
+    if st.button("🗺️ Interaktywna mapa torów F1", use_container_width=True):
+        st.session_state['aktualna_strona'] = 'Mapa'
+        st.rerun()
 
     st.markdown("---")
     
@@ -69,7 +59,7 @@ with st.sidebar:
         
         * **BDOT10k (Budynki, Wody):** [Geoportal.gov.pl](https://mapy.geoportal.gov.pl/) 
         * **NMT (Model Terenu 3D):** [Geoportal.gov.pl](https://mapy.geoportal.gov.pl/) 
-        * **Corine Land Cover:** [Copernicus Land Monitoring](https://land.copernicus.eu/en/products/corine-land-cover), [GIOŚ - Corine](https://clc.gios.gov.pl)
+        * **Corine Land Cover:** [Copernicus Land Monitoring](https://land.copernicus.eu/en/products/corine-land-cover)
         """)
 
     st.markdown("---")
@@ -167,11 +157,12 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             ax.set_xlim(min(lewy_gorny_x, prawy_dolny_x), max(lewy_gorny_x, prawy_dolny_x))
                                             ax.set_ylim(min(lewy_gorny_y, prawy_dolny_y), max(lewy_gorny_y, prawy_dolny_y))
                                             
+                                            ax.axis('off') # Ukrywa osie X/Y
+                                            
                                             st.pyplot(fig, use_container_width=False)
                                             
                                             # ==========================================
-                                            # NOWOŚĆ: IMPLEMENTACJA Z PATHFINDER.PY
-                                            # Trzy kroki analityczne (wysokość, spadki, ocena)
+                                            # SZCZEGÓŁOWE MAPY 3D
                                             # ==========================================
                                             st.markdown("---")
                                             st.subheader("📊 Analiza 3D krok po kroku (Podgląd modelu)")
@@ -182,7 +173,7 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             # MAPA 1: Oryginalny Model Terenu
                                             im1 = axes[0].imshow(macierz_wysokosci, cmap='terrain')
                                             axes[0].set_title("1. Model Terenu (Wysokość)")
-                                            axes[0].axis('off') # Ukrywa osie X/Y
+                                            axes[0].axis('off')
                                             fig_szczegoly.colorbar(im1, ax=axes[0], label="m n.p.m.")
                                             
                                             # MAPA 2: Spadki w procentach
@@ -197,7 +188,6 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             axes[2].axis('off')
                                             fig_szczegoly.colorbar(im3, ax=axes[2], label="Wynik (Tylko 3D)")
                                             
-                                            # Używamy use_container_width=True, żeby te trzy mniejsze mapy ładnie wypełniły szerokość ekranu
                                             st.pyplot(fig_szczegoly, use_container_width=True)
                                             
                                         else:
