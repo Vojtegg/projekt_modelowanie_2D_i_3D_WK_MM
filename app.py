@@ -31,7 +31,7 @@ with st.sidebar:
     except:
         st.warning("⚠️ Brak pliku 'logo.jpg' w folderze projektu.")
         
-    st.title("📌 Menu Nawigacyjne")
+    st.title("Menu Nawigacyjne")
     
     # --- PRZYCISKI NAWIGACJI ---
     if st.button("🏠 Panel Główny (Narzędzia)", use_container_width=True):
@@ -87,7 +87,7 @@ with st.sidebar:
 
 # --- PODSTRONA 1: PANEL GŁÓWNY ---
 if st.session_state['aktualna_strona'] == 'Glowna':
-    st.title("🏎️ Optymalizator Torów Wyścigowych")
+    st.title("Optymalizator Torów Wyścigowych")
     st.markdown("Wgraj dane i ustaw parametry do analizy przestrzennej (2D & 3D).")
 
     st.markdown("---")
@@ -109,11 +109,11 @@ if st.session_state['aktualna_strona'] == 'Glowna':
         spadek_max = st.slider("Maksymalny spadek terenu (%)", 1, 20, 10)
 
         st.markdown("**Opcje zaawansowane**")
-        wycinka_lasow = st.checkbox("🌲 Zezwalaj na wycinkę lasów")
-        budowa_mostow = st.checkbox("🌉 Uwzględnij budowę mostów")
+        wycinka_lasow = st.checkbox("Zezwalaj na wycinkę lasów")
+        budowa_mostow = st.checkbox("Uwzględnij budowę mostów")
    
     # PRZYCISK ANALIZY
-    run_analysis = st.button("🚀 Uruchom analizę przestrzenną", use_container_width=True)
+    run_analysis = st.button("Uruchom analizę przestrzenną", use_container_width=True)
 
     if run_analysis:
         st.info("Rozpoczynam analizę danych... Proszę czekać.")
