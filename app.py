@@ -86,22 +86,30 @@ if st.session_state['aktualna_strona'] == 'Glowna':
         st.header("📂 Wczytywanie Map")
         bdot_file = st.file_uploader("Wgraj bazę BDOT10k (.gpkg, .shp, .zip)", key="bdot")
         clc_file = st.file_uploader("Wgraj Corine Land Cover", key="clc")
-        nmt_file = st.file_uploader("Wgraj Numeryczny Model Terenu (NMT)", key="nmt")
+        
+        # Opcja na wgranie wielu kafelków NMT
+        nmt_file = st.file_uploader("Wgraj NMT (Wiele plików .zip / .asc)", key="nmt", accept_multiple_files=True)
         
     with col2:
         st.header("⚙️ Parametry Analizy")
-        
-        st.markdown("**Wykluczenia 2D**")
+        st.subheader("Wykluczenia 2D")
         bufor_budynki = st.slider("Bufor od budynków mieszkalnych (m)", 0, 500, 100)
         bufor_rekreacja = st.slider("Bufor od terenów rekreacyjnych (m)", 0, 300, 50)
-        bufor_wody = st.slider("Bufor od wód powierzchniowych (m)", 0, 200, 50)
         
-        st.markdown("**Koszty 3D**")
+        # SPRAWDZAMY STAN CHECKBOXA (zanim jeszcze narysujemy go na dole)
+        czy_mosty = st.session_state.get("mosty_key", False)
+        
+        # SUWAK WODY: Parametr 'disabled' blokuje go, gdy czy_mosty == True
+        bufor_wody = st.slider("Bufor od wód powierzchniowych (m)", 0, 200, 50, disabled=czy_mosty)
+        
+        st.subheader("Koszty 3D")
         spadek_max = st.slider("Maksymalny spadek terenu (%)", 1, 20, 10)
 
         st.markdown("**Opcje zaawansowane**")
         wycinka_lasow = st.checkbox("Zezwalaj na wycinkę lasów")
-        budowa_mostow = st.checkbox("Uwzględnij budowę mostów")
+        
+        # CHECKBOX: Dodajemy 'key', żeby Streamlit zapamiętał jego kliknięcie
+        budowa_mostow = st.checkbox("Uwzględnij budowę mostów", key="mosty_key")
    
     run_analysis = st.button("🚀 Uruchom analizę przestrzenną", use_container_width=True)
 
@@ -125,8 +133,9 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                         
                         if maska is not None:
                             st.success("✅ Analiza 2D zakończona pomyślnie!")
-                            if nmt_file is not None:
-                                with st.spinner("Wczytywanie modelu wysokościowego i obliczanie spadków..."):
+                            
+                            if nmt_file: 
+                                with st.spinner("Łączenie kafelków NMT i obliczanie spadków..."):
                                     try:
                                         macierz_wysokosci, raster_transform, raster_crs = data_loader.wczytaj_raster_z_uploadu(nmt_file)
                                         if macierz_wysokosci is not None:
@@ -138,9 +147,7 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             
                                             st.write("🗺️ **Poniżej znajduje się wygenerowana mapa wyników (Zintegrowana 2D + 3D):**")
                                             
-                                            # ==========================================
-                                            # RYSOWANIE GŁÓWNEJ MAPY
-                                            # ==========================================
+                                            # GŁÓWNA MAPA
                                             fig, ax = plt.subplots(figsize=(8, 6))
                                             show(mapa_kosztow_3d, transform=raster_transform, ax=ax, cmap='RdYlGn', title="Znalezione lokalizacje dla Toru F1")
                                             
@@ -149,7 +156,6 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             elif hasattr(maska, 'is_empty') and not maska.is_empty:
                                                 gpd.GeoSeries([maska]).plot(ax=ax, color='black', alpha=0.5, edgecolor='red', hatch='///')
                                                 
-                                            # Blokowanie kamery na NMT
                                             wysokosc, szerokosc = macierz_wysokosci.shape
                                             lewy_gorny_x, lewy_gorny_y = raster_transform * (0, 0)
                                             prawy_dolny_x, prawy_dolny_y = raster_transform * (szerokosc, wysokosc)
@@ -157,32 +163,28 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             ax.set_xlim(min(lewy_gorny_x, prawy_dolny_x), max(lewy_gorny_x, prawy_dolny_x))
                                             ax.set_ylim(min(lewy_gorny_y, prawy_dolny_y), max(lewy_gorny_y, prawy_dolny_y))
                                             
-                                            ax.axis('off') # Ukrywa osie X/Y
-                                            
+                                            ax.axis('off') 
                                             st.pyplot(fig, use_container_width=False)
                                             
                                             # ==========================================
-                                            # SZCZEGÓŁOWE MAPY 3D
+                                            # PRZYWRÓCONE 3 MAPKI Z PATHFINDERA
                                             # ==========================================
                                             st.markdown("---")
                                             st.subheader("📊 Analiza 3D krok po kroku (Podgląd modelu)")
-                                            st.write("Poniżej przedstawiono surowe etapy przetwarzania modelu Numerycznego Modelu Terenu, z których powstała główna mapa:")
+                                            st.write("Poniżej przedstawiono surowe etapy przetwarzania modelu Numerycznego Modelu Terenu:")
                                             
                                             fig_szczegoly, axes = plt.subplots(1, 3, figsize=(16, 5))
                                             
-                                            # MAPA 1: Oryginalny Model Terenu
                                             im1 = axes[0].imshow(macierz_wysokosci, cmap='terrain')
                                             axes[0].set_title("1. Model Terenu (Wysokość)")
                                             axes[0].axis('off')
                                             fig_szczegoly.colorbar(im1, ax=axes[0], label="m n.p.m.")
                                             
-                                            # MAPA 2: Spadki w procentach
                                             im2 = axes[1].imshow(macierz_spadkow, cmap='Reds', vmin=0, vmax=15)
                                             axes[1].set_title("2. Spadki Terenu (%)")
                                             axes[1].axis('off')
                                             fig_szczegoly.colorbar(im2, ax=axes[1], label="% nachylenia")
                                             
-                                            # MAPA 3: Ocena przydatności
                                             im3 = axes[2].imshow(mapa_kosztow_3d, cmap='RdYlGn', vmin=0, vmax=1)
                                             axes[2].set_title("3. Ocena przydatności (0-1)")
                                             axes[2].axis('off')

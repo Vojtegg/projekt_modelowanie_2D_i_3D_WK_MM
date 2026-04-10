@@ -1,5 +1,6 @@
 import os
 import rasterio
+from rasterio.merge import merge
 import numpy as np
 import tempfile
 import zipfile
@@ -9,7 +10,6 @@ import pandas as pd
 import streamlit as st
 
 def load_elevation_data(file_path):
-    """(Oryginalna funkcja do testów offline z Twojego kodu)"""
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"❌ BŁĄD: Nie znaleziono pliku pod ścieżką: {file_path}")
     with rasterio.open(file_path) as dataset:
@@ -21,70 +21,77 @@ def load_elevation_data(file_path):
             elevation_matrix[elevation_matrix == nodata_value] = np.nan
     return elevation_matrix, metadata
 
-def wczytaj_raster_z_uploadu(uploaded_file):
+def wczytaj_raster_z_uploadu(uploaded_files):
     """
-    NOWA WERSJA: Automatycznie radzi sobie z plikami NMT z Geoportalu.
-    Rozpakowuje pliki .zip i szuka w nich modeli .tif lub .asc.
+    Automatycznie łączy (mozaikuje) wiele kafelków NMT.
+    Działa ZARÓWNO z paczkami ZIP, jak i luzem rzuconymi plikami .asc / .tif
     """
-    if uploaded_file is None:
+    if not uploaded_files:
         return None, None, None
         
-    nazwa_pliku = uploaded_file.name
+    # Upewniamy się, że to lista plików
+    if not isinstance(uploaded_files, list):
+        uploaded_files = [uploaded_files]
+
     temp_dir = tempfile.mkdtemp()
+    raster_paths = []
     
     try:
-        temp_file_path = os.path.join(temp_dir, nazwa_pliku)
-        with open(temp_file_path, "wb") as f:
-            f.write(uploaded_file.getvalue())
-
-        plik_do_otwarcia = temp_file_path
-
-        # Jeśli wgrano ZIP (Geoportal niemal zawsze pakuje w ZIP)
-        if nazwa_pliku.lower().endswith('.zip'):
-            with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
-                zip_ref.extractall(temp_dir)
+        # 1. Zapisujemy wgrane pliki (.asc lub .zip) do folderu tymczasowego
+        for uploaded_file in uploaded_files:
+            nazwa_pliku = uploaded_file.name
+            temp_file_path = os.path.join(temp_dir, nazwa_pliku)
             
-            znaleziony_raster = None
-            # Przeszukujemy rozpakowane pliki w poszukiwaniu TIF lub ASC
-            for root, dirs, files in os.walk(temp_dir):
-                for file in files:
-                    if file.lower().endswith(('.tif', '.tiff', '.asc')):
-                        znaleziony_raster = os.path.join(root, file)
-                        break
-                if znaleziony_raster:
-                    break
+            with open(temp_file_path, "wb") as f:
+                f.write(uploaded_file.getvalue())
+
+            # Jeśli to ZIP, rozpakowujemy i wywalamy paczkę. Jeśli to .asc - zostaje.
+            if nazwa_pliku.lower().endswith('.zip'):
+                extract_dir = os.path.join(temp_dir, nazwa_pliku + "_unzipped")
+                with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
+                    zip_ref.extractall(extract_dir)
+                os.remove(temp_file_path) 
+        
+        # 2. Przeczesujemy foldery w poszukiwaniu .asc lub .tif
+        for root, dirs, files in os.walk(temp_dir):
+            for file in files:
+                if file.lower().endswith(('.tif', '.tiff', '.asc')):
+                    raster_paths.append(os.path.join(root, file))
                     
-            if znaleziony_raster:
-                plik_do_otwarcia = znaleziony_raster
-            else:
-                st.error("❌ W wgranej paczce ZIP nie znaleziono żadnego modelu wysokości (brak pliku .tif lub .asc)!")
-                return None, None, None
+        if not raster_paths:
+            st.error("❌ W wgranych plikach/paczkach nie znaleziono żadnego modelu wysokości (.tif lub .asc)!")
+            return None, None, None
 
-        # Otwieramy prawdziwy raster
-        with rasterio.open(plik_do_otwarcia) as src:
-            macierz_wysokosci = src.read(1)  
-            transform = src.transform  
-            crs = src.crs   
-            nodata = src.nodata
-            
-            macierz_wysokosci = macierz_wysokosci.astype(np.float32)
-            
-            # Usuwamy wartości puste/NoData z Geoportalu
-            if nodata is not None:
-                macierz_wysokosci[macierz_wysokosci == nodata] = np.nan
-            # Zabezpieczenie przed tzw. "dziurami" (Geoportal czasem wstawia -9999 jako nodata w plikach .asc)
-            macierz_wysokosci[macierz_wysokosci < -100] = np.nan 
+        # 3. Zszywamy pliki w jeden wielki obszar
+        src_files_to_mosaic = []
+        for fp in raster_paths:
+            src_files_to_mosaic.append(rasterio.open(fp))
 
-        return macierz_wysokosci, transform, crs
+        # ŁATKA: Wymuszamy, aby dziury między mapami były "brakiem danych", a nie wys. 0m
+        nodata = src_files_to_mosaic[0].nodata
+        merge_nodata = nodata if nodata is not None else -9999.0
+
+        mosaic, out_trans = merge(src_files_to_mosaic, nodata=merge_nodata)
+        out_crs = src_files_to_mosaic[0].crs
+
+        for src in src_files_to_mosaic:
+            src.close()
+            
+        macierz_wysokosci = mosaic[0].astype(np.float32)
+        
+        # 4. Docinanie czarnych krawędzi Geoportalu
+        macierz_wysokosci[macierz_wysokosci == merge_nodata] = np.nan
+        macierz_wysokosci[macierz_wysokosci < -100] = np.nan 
+
+        return macierz_wysokosci, out_trans, out_crs
         
     except Exception as e:
-        st.error(f"❌ Błąd podczas otwierania pliku NMT: {e}")
+        st.error(f"❌ Błąd podczas łączenia kafelków NMT: {e}")
         return None, None, None
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 def _bezpieczny_odczyt_wektora(sciezka):
-    """Bezpiecznie wczytuje warstwy BDOT (ignoruje puste pliki w których nie ma poligonów)."""
     try:
         gdf = gpd.read_file(sciezka)
         if gdf.empty:
