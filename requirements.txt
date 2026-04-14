@@ -22,3 +22,6 @@ rasterio>=1.3.0
 
 # Algorytmy i szukanie trasy (Pathfinder - AI)
 scikit-image>=0.21.0
+
+# Algorytmy i szukanie trasy (Pathfinder - AI)
+scikit-image>=0.21.0
