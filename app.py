@@ -5,11 +5,14 @@ import folium
 from streamlit_folium import st_folium
 import matplotlib.pyplot as plt
 from rasterio.plot import show
+import rasterio.features
+import numpy as np
 
 # Importy z Twojego folderu src
 from src import data_loader 
 from src import terrain_3d
 from src import filter_2d
+from src import pathfinder
 
 # ==========================================
 # KONFIGURACJA APLIKACJI 
@@ -59,7 +62,7 @@ with st.sidebar:
         
         * **BDOT10k (Budynki, Wody):** [Geoportal.gov.pl](https://mapy.geoportal.gov.pl/) 
         * **NMT (Model Terenu 3D):** [Geoportal.gov.pl](https://mapy.geoportal.gov.pl/) 
-        * **Corine Land Cover:** [Copernicus Land Monitoring](https://land.copernicus.eu/en/products/corine-land-cover)
+        * **Corine Land Cover:** [Copernicus Land Monitoring](https://clc.gios.gov.pl/index.php/o-clc/definicje-klas)
         """)
 
     st.markdown("---")
@@ -143,11 +146,13 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             mapa_kosztow_3d = terrain_3d.score_topography(macierz_spadkow, optimal_slope=2.0, max_slope=spadek_max)
                                             
                                             st.success("✅ Analiza wysokościowa (3D) zakończona pomyślnie!")
-                                            st.balloons()
+                                            
                                             
                                             st.write("🗺️ **Poniżej znajduje się wygenerowana mapa wyników (Zintegrowana 2D + 3D):**")
                                             
-                                            # GŁÓWNA MAPA
+                                            # ==========================================
+                                            # GŁÓWNA MAPA (Bez toru)
+                                            # ==========================================
                                             fig, ax = plt.subplots(figsize=(8, 6))
                                             show(mapa_kosztow_3d, transform=raster_transform, ax=ax, cmap='RdYlGn', title="Znalezione lokalizacje dla Toru F1")
                                             
@@ -162,12 +167,96 @@ if st.session_state['aktualna_strona'] == 'Glowna':
 
                                             ax.set_xlim(min(lewy_gorny_x, prawy_dolny_x), max(lewy_gorny_x, prawy_dolny_x))
                                             ax.set_ylim(min(lewy_gorny_y, prawy_dolny_y), max(lewy_gorny_y, prawy_dolny_y))
-                                            
                                             ax.axis('off') 
-                                            st.pyplot(fig, use_container_width=False)
+                                            
+                                            
                                             
                                             # ==========================================
-                                            # PRZYWRÓCONE 3 MAPKI Z PATHFINDERA
+                                            # NOWOŚĆ: DRUGA MAPA - GENEROWANIE TORU (PATHFINDER)
+                                            # ==========================================
+                                            st.markdown("---")
+                                            st.write("🏎️ **Wyznaczanie optymalnej pętli toru...**")
+                                            with st.spinner("Algorytm AI szuka najlepszej ścieżki (to może chwilę potrwać)..."):
+                                                
+                                                # 1. Rasteryzacja masek 2D
+                                                if hasattr(maska, 'geometry'):
+                                                    geometrie = [(geom, 1) for geom in maska.geometry]
+                                                else:
+                                                    geometrie = [(maska, 1)] 
+                                                    
+                                                maska_raster = rasterio.features.rasterize(
+                                                    geometrie,
+                                                    out_shape=macierz_wysokosci.shape,
+                                                    transform=raster_transform,
+                                                    fill=0,
+                                                    dtype='uint8'
+                                                )
+
+                                                # 2. Tworzenie macierzy kosztów
+                                                # Zwiększamy karę za trudny teren (czerwone pola) z 100 na 5000.
+                                                # Zielony teren nadal kosztuje 1.0, ale czerwony jest teraz 5000 razy droższy!
+                                                cost_matrix = 5000.0 - (mapa_kosztow_3d * 4999.0)
+
+                                                # Zamiast 'np.inf' (które często psuje pathfindery), dajemy kosmicznie wysoką liczbę.
+                                                # To gwarantuje, że algorytm potraktuje maskę (budynki, wodę) jako betonowy mur.
+                                                cost_matrix[maska_raster == 1] = 9999999.0
+                                                
+                                                # 3. Wywołanie silnika
+                                            track_path, statystyki_toru = pathfinder.generate_track_loop(cost_matrix, num_waypoints=4)
+                                            
+                                            # ==========================================
+                                            # NOWOŚĆ: WYŚWIETLANIE MAP OBOK SIEBIE (KOLUMNY)
+                                            # ==========================================
+                                            st.markdown("---")
+                                            col_mapa1, col_mapa2 = st.columns(2)
+                                            
+                                            with col_mapa1:
+                                                st.write("🗺️ **Mapa przydatności terenu (2D + 3D)**")
+                                                # WYŚWIETLAMY PIERWSZĄ MAPĘ DOPIERO TUTAJ
+                                                # Ustawiamy use_container_width=True, żeby idealnie wpasowała się w kolumnę!
+                                                st.pyplot(fig, use_container_width=True)
+
+                                            with col_mapa2:
+                                                st.write("🏎️ **Zaprojektowany Tor F1**")
+                                                
+                                                fig2, ax2 = plt.subplots(figsize=(8, 6))
+                                                show(mapa_kosztow_3d, transform=raster_transform, ax=ax2, cmap='RdYlGn', title="Zaprojektowany Tor F1")
+                                                
+                                                if hasattr(maska, 'empty') and not maska.empty:
+                                                    maska.plot(ax=ax2, color='black', alpha=0.5, edgecolor='red', hatch='///')
+                                                elif hasattr(maska, 'is_empty') and not maska.is_empty:
+                                                    gpd.GeoSeries([maska]).plot(ax=ax2, color='black', alpha=0.5, edgecolor='red', hatch='///')
+                                                    
+                                                # Rysowanie wyznaczonego toru
+                                                if track_path is not None:
+                                                    xs, ys = rasterio.transform.xy(raster_transform, track_path[:, 0], track_path[:, 1])
+                                                    ax2.plot(xs, ys, color='blue', linewidth=4, linestyle='-', label="Trasa")
+                                                    ax2.legend()
+                                                    
+                                                ax2.set_xlim(min(lewy_gorny_x, prawy_dolny_x), max(lewy_gorny_x, prawy_dolny_x))
+                                                ax2.set_ylim(min(lewy_gorny_y, prawy_dolny_y), max(lewy_gorny_y, prawy_dolny_y))
+                                                ax2.axis('off')
+                                                
+                                                # Wyświetlenie drugiej mapy
+                                                st.pyplot(fig2, use_container_width=True)
+
+                                            # =========================================
+                                            # STATYSTYKI POD MAPAMI
+                                            # =========================================
+                                            if track_path is not None:
+                                                st.success("🏁 Algorytm optymalizacyjny pomyślnie zamknął pętlę!")
+                                                st.markdown("### 📊 Statystyki wygenerowanego toru:")
+                                                
+                                                colA, colB = st.columns(2)
+                                                with colA:
+                                                    st.metric(label="📐 Szacowana długość", value=f"{statystyki_toru['dlugosc_km']} km")
+                                                with colB:
+                                                    st.metric(label="🔲 Rozmiar trasy w siatce", value=f"{statystyki_toru['ilosc_pikseli']} pikseli")
+                                            else:
+                                                st.error("❌ Algorytm nie znalazł miejsca na zamkniętą pętlę (zbyt dużo przeszkód).")
+
+                                            # ==========================================
+                                            # 3 MAPKI CZESCIOWE
                                             # ==========================================
                                             st.markdown("---")
                                             st.subheader("📊 Analiza 3D krok po kroku (Podgląd modelu)")
