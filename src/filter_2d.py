@@ -26,13 +26,32 @@ def wygeneruj_maske_wykluczen(bdot_slownik, clc_gdf, buf_bud, buf_rek, buf_woda,
         if not budowa_mostow and bdot_slownik['wody'] is not None and not bdot_slownik['wody'].empty:
             lista_wykluczen.append(bdot_slownik['wody'].geometry.buffer(buf_woda).unary_union)
 
-        # D. OMINIĘCIE ISTNIEJĄCYCH JEZDNI I TORÓW
+        # D. OMINIĘCIE ISTNIEJĄCYCH JEZDNI (Tylko najtwardsze nawierzchnie)
         if bdot_slownik['jezdnie'] is not None and not bdot_slownik['jezdnie'].empty:
-            lista_wykluczen.append(bdot_slownik['jezdnie'].geometry.buffer(10).unary_union)
+            jezdnie = bdot_slownik['jezdnie']
+            
+            # Szukamy kolumny
+            kolumna_nawierzchni = None
+            for col in jezdnie.columns:
+                if 'naw' in col.lower() or 'rodz' in col.lower() or 'typ' in col.lower():
+                    kolumna_nawierzchni = col
+                    break
+            
+            if kolumna_nawierzchni:
+                # ODWRÓCONA LOGIKA: Zostawiamy w spokoju TYLKO drogi, które mają w nazwie 
+                # 'bitum' (masa bitumiczna to asfalt), 'beton' lub 'kostk' (kostka). 
+                # Cała reszta (żwir, grunt, tłuczeń) znika z radaru przeszkód!
+                twarde_drogi = jezdnie[jezdnie[kolumna_nawierzchni].astype(str).str.contains('bitum|beton|kostk', case=False, na=False, regex=True)]
+            else:
+                # Jak nie wiemy co to za droga, to jej nie blokujemy
+                twarde_drogi = gpd.GeoDataFrame(geometry=[], crs=jezdnie.crs) 
+                
+            # Nakładamy bufor tylko na ten prawdziwy, twardy asfalt/kostkę
+            if not twarde_drogi.empty:
+                lista_wykluczen.append(twarde_drogi.geometry.buffer(10).unary_union)
             
         if bdot_slownik['tory'] is not None and not bdot_slownik['tory'].empty:
             lista_wykluczen.append(bdot_slownik['tory'].geometry.buffer(10).unary_union)
-
     # =========================================
     # 2. ANALIZA CORINE LAND COVER (Reszta zostaje bez zmian)
     # =========================================
