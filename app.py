@@ -62,7 +62,7 @@ with st.sidebar:
         
         * **BDOT10k (Budynki, Wody):** [Geoportal.gov.pl](https://mapy.geoportal.gov.pl/) 
         * **NMT (Model Terenu 3D):** [Geoportal.gov.pl](https://mapy.geoportal.gov.pl/) 
-        * **Corine Land Cover:** [Copernicus Land Monitoring](https://clc.gios.gov.pl/index.php/o-clc/definicje-klas)
+        * **Corine Land Cover:** [GIOŚ - Corine](https://clc.gios.gov.pl/)
         """)
 
     st.markdown("---")
