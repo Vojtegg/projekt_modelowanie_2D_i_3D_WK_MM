@@ -11,7 +11,7 @@ import streamlit as st
 
 def load_elevation_data(file_path):
     if not os.path.exists(file_path):
-        raise FileNotFoundError(f"❌ BŁĄD: Nie znaleziono pliku pod ścieżką: {file_path}")
+        raise FileNotFoundError(f"BŁĄD: Nie znaleziono pliku pod ścieżką: {file_path}")
     with rasterio.open(file_path) as dataset:
         elevation_matrix = dataset.read(1)
         metadata = dataset.profile
@@ -86,7 +86,7 @@ def wczytaj_raster_z_uploadu(uploaded_files):
         return macierz_wysokosci, out_trans, out_crs
         
     except Exception as e:
-        st.error(f"❌ Błąd podczas łączenia kafelków NMT: {e}")
+        st.error(f"Błąd podczas łączenia kafelków NMT: {e}")
         return None, None, None
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)

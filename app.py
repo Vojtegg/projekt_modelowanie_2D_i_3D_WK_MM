@@ -8,47 +8,46 @@ from rasterio.plot import show
 import rasterio.features
 import numpy as np
 
-# Importy z Twojego folderu src
 from src import data_loader 
 from src import terrain_3d
 from src import filter_2d
 from src import pathfinder
 
-# ==========================================
+
 # KONFIGURACJA APLIKACJI 
-# ==========================================
+
 st.set_page_config(page_title="Generator Torów F1", layout="wide")
 
 if 'aktualna_strona' not in st.session_state:
     st.session_state['aktualna_strona'] = 'Glowna'
 
-# ==========================================
-# PASEK BOCZNY (Tylko duże, czyste przyciski!)
-# ==========================================
+
+# PASEK BOCZNY 
+
 with st.sidebar:
     try:
         st.image("logo.jpg", use_container_width=True)
     except:
-        st.warning("⚠️ Brak pliku 'logo.jpg' w folderze projektu.")
+        st.warning("Brak pliku 'logo.jpg' w folderze projektu.")
         
-    st.title("📌 Menu Nawigacyjne")
+    st.title("Menu Nawigacyjne")
     
-    # --- PRZYCISKI NAWIGACJI ---
-    if st.button("🏠 Panel Główny (Narzędzia)", use_container_width=True):
+    # PRZYCISKI NAWIGACJI 
+    if st.button("Panel Główny (Narzędzia)", use_container_width=True):
         st.session_state['aktualna_strona'] = 'Glowna'
         st.rerun() 
         
-    if st.button("ℹ️ Jak działa program", use_container_width=True):
+    if st.button("Jak działa program", use_container_width=True):
         st.session_state['aktualna_strona'] = 'Opis'
         st.rerun()
         
-    if st.button("🗺️ Interaktywna mapa torów F1", use_container_width=True):
+    if st.button("Interaktywna mapa torów F1", use_container_width=True):
         st.session_state['aktualna_strona'] = 'Mapa'
         st.rerun()
 
     st.markdown("---")
     
-    with st.expander("📖 Jak używać aplikacji?"):
+    with st.expander("Jak używać aplikacji?"):
         st.markdown("""
         **Krok 1:** Przejdź do Panelu Głównego.
         **Krok 2:** Wgraj pliki `.shp` / `.gpkg` oraz Numeryczny Model Terenu.
@@ -56,7 +55,7 @@ with st.sidebar:
         **Krok 4:** Kliknij *Uruchom analizę*.
         """)
     
-    with st.expander("📥 Skąd pobrać dane?"):
+    with st.expander("Skąd pobrać dane?"):
         st.markdown("""
         Dane przestrzenne do analizy pobierzesz całkowicie za darmo z oficjalnych rejestrów:
         
@@ -71,14 +70,14 @@ with st.sidebar:
     **O projekcie:**
     Aplikacja do wielokryterialnej analizy przestrzennej, optymalizująca lokalizację torów wyścigowych z użyciem danych GIS.
     
-    👨‍💻 **Autorzy i role:**
+    **Autorzy i role:**
     * **Michał Medyński** – Interfejs (Streamlit), analizy wektorowe 2D i maski wykluczeń.
     * **Wojtek Kobiela** – Analiza wysokościowa 3D (NMT), fuzja danych i algorytmy tras.
     """)
 
-# ==========================================
-# PODSTRONA 1: GŁÓWNA CZĘŚĆ EKRANU (ANALIZA)
-# ==========================================
+
+# PODSTRONA 1: GŁÓWNA CZĘŚĆ EKRANU 
+
 if st.session_state['aktualna_strona'] == 'Glowna':
     st.title("Optymalizator Torów Wyścigowych")
     st.markdown("Wgraj dane i ustaw parametry do analizy przestrzennej (2D & 3D).")
@@ -86,7 +85,7 @@ if st.session_state['aktualna_strona'] == 'Glowna':
     
     col1, col2 = st.columns(2)
     with col1:
-        st.header("📂 Wczytywanie Map")
+        st.header("Wczytywanie Map")
         bdot_file = st.file_uploader("Wgraj bazę BDOT10k (.gpkg, .shp, .zip)", key="bdot")
         clc_file = st.file_uploader("Wgraj Corine Land Cover", key="clc")
         
@@ -94,12 +93,12 @@ if st.session_state['aktualna_strona'] == 'Glowna':
         nmt_file = st.file_uploader("Wgraj NMT (Wiele plików .zip / .asc)", key="nmt", accept_multiple_files=True)
         
     with col2:
-        st.header("⚙️ Parametry Analizy")
+        st.header("Parametry Analizy")
         st.subheader("Wykluczenia 2D")
         bufor_budynki = st.slider("Bufor od budynków mieszkalnych (m)", 0, 500, 100)
         bufor_rekreacja = st.slider("Bufor od terenów rekreacyjnych (m)", 0, 300, 50)
         
-        # SPRAWDZAMY STAN CHECKBOXA (zanim jeszcze narysujemy go na dole)
+        # SPRAWDZAMY STAN CHECKBOXA 
         czy_mosty = st.session_state.get("mosty_key", False)
         
         # SUWAK WODY: Parametr 'disabled' blokuje go, gdy czy_mosty == True
@@ -114,11 +113,11 @@ if st.session_state['aktualna_strona'] == 'Glowna':
         # CHECKBOX: Dodajemy 'key', żeby Streamlit zapamiętał jego kliknięcie
         budowa_mostow = st.checkbox("Uwzględnij budowę mostów", key="mosty_key")
    
-    run_analysis = st.button("🚀 Uruchom analizę przestrzenną", use_container_width=True)
+    run_analysis = st.button("Uruchom analizę przestrzenną", use_container_width=True)
 
     if run_analysis:
         if bdot_file is None or clc_file is None:
-            st.error("⚠️ Proszę wgrać pliki BDOT10k oraz Corine Land Cover przed uruchomieniem analizy!")
+            st.error("Proszę wgrać pliki BDOT10k oraz Corine Land Cover przed uruchomieniem analizy!")
         else:
             st.info("Rozpoczynam analizę danych... Proszę czekać.")
             with st.spinner("Przetwarzanie map wektorowych (BDOT i CLC)..."):
@@ -135,7 +134,7 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                         )
                         
                         if maska is not None:
-                            st.success("✅ Analiza 2D zakończona pomyślnie!")
+                            st.success("Analiza 2D zakończona pomyślnie!")
                             
                             if nmt_file: 
                                 with st.spinner("Łączenie kafelków NMT i obliczanie spadków..."):
@@ -145,14 +144,14 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             macierz_spadkow = terrain_3d.calculate_slope(macierz_wysokosci, cell_size=1.0)
                                             mapa_kosztow_3d = terrain_3d.score_topography(macierz_spadkow, optimal_slope=2.0, max_slope=spadek_max)
                                             
-                                            st.success("✅ Analiza wysokościowa (3D) zakończona pomyślnie!")
+                                            st.success("Analiza wysokościowa (3D) zakończona pomyślnie!")
                                             
                                             
-                                            st.write("🗺️ **Poniżej znajduje się wygenerowana mapa wyników (Zintegrowana 2D + 3D):**")
+                                            st.write("**Poniżej znajduje się wygenerowana mapa wyników (Zintegrowana 2D + 3D):**")
                                             
-                                            # ==========================================
+                                            
                                             # GŁÓWNA MAPA (Bez toru)
-                                            # ==========================================
+                                            
                                             fig, ax = plt.subplots(figsize=(8, 6))
                                             show(mapa_kosztow_3d, transform=raster_transform, ax=ax, cmap='RdYlGn', title="Znalezione lokalizacje dla Toru F1")
                                             
@@ -171,9 +170,9 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             
                                             
                                             
-                                            # ==========================================
-                                            # NOWOŚĆ: DRUGA MAPA - GENEROWANIE TORU (PATHFINDER)
-                                            # ==========================================
+                                            
+                                            # NOWOŚĆ: DRUGA MAPA - GENEROWANIE TORU 
+                                            
                                             st.markdown("---")
                                             st.write("🏎️ **Wyznaczanie optymalnej pętli toru...**")
                                             with st.spinner("Algorytm AI szuka najlepszej ścieżki (to może chwilę potrwać)..."):
@@ -193,27 +192,25 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                                 )
 
                                                 # 2. Tworzenie macierzy kosztów
-                                                # Zwiększamy karę za trudny teren (czerwone pola) z 100 na 5000.
-                                                # Zielony teren nadal kosztuje 1.0, ale czerwony jest teraz 5000 razy droższy!
+                                                
                                                 cost_matrix = 5000.0 - (mapa_kosztow_3d * 4999.0)
 
-                                                # Zamiast 'np.inf' (które często psuje pathfindery), dajemy kosmicznie wysoką liczbę.
-                                                # To gwarantuje, że algorytm potraktuje maskę (budynki, wodę) jako betonowy mur.
+                                                
                                                 cost_matrix[maska_raster == 1] = 9999999.0
                                                 
                                                 # 3. Wywołanie silnika
                                             track_path, statystyki_toru = pathfinder.generate_track_loop(cost_matrix, num_waypoints=4)
                                             
-                                            # ==========================================
+                                            
                                             # NOWOŚĆ: WYŚWIETLANIE MAP OBOK SIEBIE (KOLUMNY)
-                                            # ==========================================
+                                            
                                             st.markdown("---")
                                             col_mapa1, col_mapa2 = st.columns(2)
                                             
                                             with col_mapa1:
                                                 st.write("🗺️ **Mapa przydatności terenu (2D + 3D)**")
                                                 # WYŚWIETLAMY PIERWSZĄ MAPĘ DOPIERO TUTAJ
-                                                # Ustawiamy use_container_width=True, żeby idealnie wpasowała się w kolumnę!
+                                                
                                                 st.pyplot(fig, use_container_width=True)
 
                                             with col_mapa2:
@@ -240,26 +237,26 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                                 # Wyświetlenie drugiej mapy
                                                 st.pyplot(fig2, use_container_width=True)
 
-                                            # =========================================
+                                            
                                             # STATYSTYKI POD MAPAMI
-                                            # =========================================
+                                            
                                             if track_path is not None:
-                                                st.success("🏁 Algorytm optymalizacyjny pomyślnie zamknął pętlę!")
-                                                st.markdown("### 📊 Statystyki wygenerowanego toru:")
+                                                st.success("Algorytm optymalizacyjny pomyślnie zamknął pętlę!")
+                                                st.markdown("### Statystyki wygenerowanego toru:")
                                                 
                                                 colA, colB = st.columns(2)
                                                 with colA:
-                                                    st.metric(label="📐 Szacowana długość", value=f"{statystyki_toru['dlugosc_km']} km")
+                                                    st.metric(label="Szacowana długość", value=f"{statystyki_toru['dlugosc_km']} km")
                                                 with colB:
-                                                    st.metric(label="🔲 Rozmiar trasy w siatce", value=f"{statystyki_toru['ilosc_pikseli']} pikseli")
+                                                    st.metric(label="Rozmiar trasy w siatce", value=f"{statystyki_toru['ilosc_pikseli']} pikseli")
                                             else:
-                                                st.error("❌ Algorytm nie znalazł miejsca na zamkniętą pętlę (zbyt dużo przeszkód).")
+                                                st.error("Algorytm nie znalazł miejsca na zamkniętą pętlę (zbyt dużo przeszkód).")
 
-                                            # ==========================================
+                                            
                                             # 3 MAPKI CZESCIOWE
-                                            # ==========================================
+                                            
                                             st.markdown("---")
-                                            st.subheader("📊 Analiza 3D krok po kroku (Podgląd modelu)")
+                                            st.subheader("Analiza 3D krok po kroku (Podgląd modelu)")
                                             st.write("Poniżej przedstawiono surowe etapy przetwarzania modelu Numerycznego Modelu Terenu:")
                                             
                                             fig_szczegoly, axes = plt.subplots(1, 3, figsize=(16, 5))
@@ -282,28 +279,28 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             st.pyplot(fig_szczegoly, use_container_width=True)
                                             
                                         else:
-                                            st.error("❌ Błąd: Nie udało się wczytać macierzy z NMT.")
+                                            st.error("Błąd: Nie udało się wczytać macierzy z NMT.")
                                     except Exception as e:
-                                        st.error(f"❌ Wystąpił błąd podczas analizy 3D: {e}")
+                                        st.error(f"Wystąpił błąd podczas analizy 3D: {e}")
                             else:
-                                st.warning("⚠️ Nie wgrano pliku NMT. Ominięto analizę 3D.")
+                                st.warning("Nie wgrano pliku NMT. Ominięto analizę 3D.")
                         else:
-                            st.error("❌ Błąd: Funkcja filtrująca 2D nie zwróciła wyniku.")
+                            st.error("Błąd: Funkcja filtrująca 2D nie zwróciła wyniku.")
                     else:
-                        st.error("❌ Błąd: Nie udało się wczytać map wektorowych.")
+                        st.error("Błąd: Nie udało się wczytać map wektorowych.")
                 except Exception as e:
-                    st.error(f"❌ Wystąpił błąd podczas analizy 2D: {e}")
+                    st.error(f"Wystąpił błąd podczas analizy 2D: {e}")
 
-# ==========================================
+
 # PODSTRONA 2: INSTRUKCJA I OPIS
-# ==========================================
+
 elif st.session_state['aktualna_strona'] == 'Opis':
     col_tytul, col_przycisk = st.columns([4, 1])
     with col_tytul:
-        st.title("ℹ️ Metodologia badawcza i opisy analiz")
+        st.title("Metodologia badawcza i opisy analiz")
     with col_przycisk:
         st.write("") 
-        if st.button("⬅️ Wróć do Panelu", key="wroc_z_opisu"):
+        if st.button("Wróć do Panelu", key="wroc_z_opisu"):
             st.session_state['aktualna_strona'] = 'Glowna'
             st.rerun()
             
@@ -322,16 +319,16 @@ elif st.session_state['aktualna_strona'] == 'Opis':
     * Upewniamy się, że maksymalne nachylenie toru nie przekracza dopuszczalnych norm wyścigowych.
     """)
 
-# ==========================================
-# PODSTRONA 3: MAPA POGLĄDOWA (FOLIUM)
-# ==========================================
+
+# PODSTRONA 3: MAPA POGLĄDOWA 
+
 elif st.session_state['aktualna_strona'] == 'Mapa':
     col_tytul, col_przycisk = st.columns([4, 1])
     with col_tytul:
-        st.title("🌍 Interaktywna mapa torów F1 na sezon 2026")
+        st.title("Interaktywna mapa torów F1 na sezon 2026")
     with col_przycisk:
         st.write("") 
-        if st.button("⬅️ Wróć do Panelu", key="wroc_z_mapy"):
+        if st.button("Wróć do Panelu", key="wroc_z_mapy"):
             st.session_state['aktualna_strona'] = 'Glowna'
             st.rerun()
             

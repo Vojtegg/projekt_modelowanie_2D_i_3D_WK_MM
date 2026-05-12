@@ -9,9 +9,9 @@ def wygeneruj_maske_wykluczen(bdot_slownik, clc_gdf, buf_bud, buf_rek, buf_woda,
     """
     lista_wykluczen = []
 
-    # =========================================
-    # 1. ANALIZA BDOT10k (Bufory i Bezpieczeństwo)
-    # =========================================
+    
+    # 1. ANALIZA BDOT10k 
+    
     if bdot_slownik is not None:
         
         # A. BUDYNKI 
@@ -26,7 +26,7 @@ def wygeneruj_maske_wykluczen(bdot_slownik, clc_gdf, buf_bud, buf_rek, buf_woda,
         if not budowa_mostow and bdot_slownik['wody'] is not None and not bdot_slownik['wody'].empty:
             lista_wykluczen.append(bdot_slownik['wody'].geometry.buffer(buf_woda).unary_union)
 
-        # D. OMINIĘCIE ISTNIEJĄCYCH JEZDNI (Tylko najtwardsze nawierzchnie)
+        # D. OMINIĘCIE ISTNIEJĄCYCH JEZDNI 
         if bdot_slownik['jezdnie'] is not None and not bdot_slownik['jezdnie'].empty:
             jezdnie = bdot_slownik['jezdnie']
             
@@ -40,7 +40,7 @@ def wygeneruj_maske_wykluczen(bdot_slownik, clc_gdf, buf_bud, buf_rek, buf_woda,
             if kolumna_nawierzchni:
                 # ODWRÓCONA LOGIKA: Zostawiamy w spokoju TYLKO drogi, które mają w nazwie 
                 # 'bitum' (masa bitumiczna to asfalt), 'beton' lub 'kostk' (kostka). 
-                # Cała reszta (żwir, grunt, tłuczeń) znika z radaru przeszkód!
+                # Cała reszta (żwir, grunt, tłuczeń) znika z radaru przeszkód
                 twarde_drogi = jezdnie[jezdnie[kolumna_nawierzchni].astype(str).str.contains('bitum|beton|kostk', case=False, na=False, regex=True)]
             else:
                 # Jak nie wiemy co to za droga, to jej nie blokujemy
@@ -52,9 +52,9 @@ def wygeneruj_maske_wykluczen(bdot_slownik, clc_gdf, buf_bud, buf_rek, buf_woda,
             
         if bdot_slownik['tory'] is not None and not bdot_slownik['tory'].empty:
             lista_wykluczen.append(bdot_slownik['tory'].geometry.buffer(10).unary_union)
-    # =========================================
-    # 2. ANALIZA CORINE LAND COVER (Reszta zostaje bez zmian)
-    # =========================================
+    
+    # 2. ANALIZA CORINE LAND COVER 
+    
     kolumna_clc = next((col for col in clc_gdf.columns if re.match(r'(?i)^code_\d{2}$', str(col))), None)
     
     if kolumna_clc:
