@@ -59,7 +59,7 @@ def wczytaj_raster_z_uploadu(uploaded_files):
                     raster_paths.append(os.path.join(root, file))
                     
         if not raster_paths:
-            st.error("❌ W wgranych plikach/paczkach nie znaleziono żadnego modelu wysokości (.tif lub .asc)!")
+            st.error("W wgranych plikach/paczkach nie znaleziono żadnego modelu wysokości (.tif lub .asc)!")
             return None, None, None
 
         # 3. Zszywamy pliki w jeden wielki obszar

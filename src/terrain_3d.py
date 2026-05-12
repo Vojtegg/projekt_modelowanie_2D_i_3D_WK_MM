@@ -53,24 +53,3 @@ def score_topography(slope_matrix, optimal_slope=2.0, max_slope=8.0):
     score_matrix[np.isnan(slope_matrix)] = 0.0
     
     return score_matrix
-
-# ==========================================
-# SEKCJA TESTOWA
-# ==========================================
-if __name__ == "__main__":
-    # Generujemy szybką, sztuczną macierz wysokościową do testów (bez wczytywania plików)
-    # Wyobraź sobie schody: płasko (100m), potem mała górka (105m), potem klif (150m)
-    test_elevation = np.array([
-        [100.0, 100.0, 100.0],
-        [105.0, 105.0, 105.0],  # 5 metrów różnicy (spadek)
-        [150.0, 150.0, 150.0]   # 45 metrów różnicy (klif!)
-    ])
-    
-    print("--- Testujemy matematykę 3D ---")
-    spadki_proc = calculate_slope(test_elevation, cell_size=1.0)
-    print("\nWyliczone spadki w procentach:")
-    print(np.round(spadki_proc, 1))
-    
-    ocena = score_topography(spadki_proc, optimal_slope=2.0, max_slope=10.0)
-    print("\nOcena przydatności pod tor (0 do 1):")
-    print(np.round(ocena, 2))

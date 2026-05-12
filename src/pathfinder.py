@@ -7,14 +7,13 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
     Szuka optymalnej, zamkniętej pętli (toru) na mapie kosztów.
     Zwraca tuple: (trasa_numpy, statystyki_slownik)
     """
-    print("🏎️ Pathfinder: Rozpoczynam wyznaczanie pętli...")
+    print("Pathfinder: Rozpoczynam wyznaczanie pętli...")
     
     bezpieczna_macierz = np.where(np.isinf(cost_matrix), 99999, cost_matrix)
     wysokosc, szerokosc = bezpieczna_macierz.shape
     
-    # =========================================
     # NAPRAWA 3: Niewidzialna ściana wokół mapy (Zakaz ucieczek)
-    # =========================================
+    
     grubosc_ramki = 20
     bezpieczna_macierz[:grubosc_ramki, :] = 99999
     bezpieczna_macierz[-grubosc_ramki:, :] = 99999
@@ -46,9 +45,8 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
         y = int((center_y + przesuniecie_y) + losowy_radius * np.sin(angle))
         x = int((center_x + przesuniecie_x) + losowy_radius * np.cos(angle))
         
-        # =========================================
         # NAPRAWA 4: Margines (Odrywamy punkty od zera!)
-        # =========================================
+        
         margines = 25
         y = int(np.clip(y, margines, wysokosc - margines - 1))
         x = int(np.clip(x, margines, szerokosc - margines - 1))
@@ -89,7 +87,7 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
                 dynamiczna_macierz_kosztow[py, px] += 50000 
                 
         except ValueError:
-            print(f"❌ Pathfinder: Brak przejścia między {start} a {end}.")
+            print(f"Pathfinder: Brak przejścia między {start} a {end}.")
             return None, None 
 
     full_path.append(waypoints[-1])
@@ -113,6 +111,6 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
         "ilosc_pikseli": len(full_path)
     }
     
-    print(f"🏁 Pathfinder: Trasa wygenerowana ({dlugosc_km} km)!")
+    print(f"Pathfinder: Trasa wygenerowana ({dlugosc_km} km)!")
     
     return np.array(full_path), statystyki_toru

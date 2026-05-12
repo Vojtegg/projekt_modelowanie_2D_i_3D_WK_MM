@@ -9,7 +9,6 @@ def wygeneruj_maske_wykluczen(bdot_slownik, clc_gdf, buf_bud, buf_rek, buf_woda,
     """
     lista_wykluczen = []
 
-    
     # 1. ANALIZA BDOT10k 
     
     if bdot_slownik is not None:

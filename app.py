@@ -126,7 +126,7 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                     clc_gdf = data_loader.wczytaj_wektor_z_uploadu(clc_file)
                     
                     if bdot_slownik is not None and clc_gdf is not None:
-                        st.write("🛡️ Generowanie mapy wykluczeń (2D)...")
+                        st.write("Generowanie mapy wykluczeń (2D)...")
                         maska = filter_2d.wygeneruj_maske_wykluczen(
                             bdot_slownik=bdot_slownik, clc_gdf=clc_gdf,
                             buf_bud=bufor_budynki, buf_rek=bufor_rekreacja, buf_woda=bufor_wody,
@@ -318,7 +318,6 @@ elif st.session_state['aktualna_strona'] == 'Opis':
     Na podstawie Numerycznego Modelu Terenu (NMT) generujemy mapę spadków (Slope). 
     * Upewniamy się, że maksymalne nachylenie toru nie przekracza dopuszczalnych norm wyścigowych.
     """)
-
 
 # PODSTRONA 3: MAPA POGLĄDOWA 
 
