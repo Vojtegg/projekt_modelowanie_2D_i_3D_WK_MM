@@ -80,7 +80,7 @@ with st.sidebar:
 
 if st.session_state['aktualna_strona'] == 'Glowna':
     st.title("Optymalizator Torów Wyścigowych")
-    st.markdown("Wgraj dane i ustaw parametry do analizy przestrzennej (2D & 3D).")
+    st.markdown("Wgraj dane i ustaw parametry do analizy przestrzennej.")
     st.markdown("---")
     
     col1, col2 = st.columns(2)
@@ -101,7 +101,6 @@ if st.session_state['aktualna_strona'] == 'Glowna':
         # SPRAWDZAMY STAN CHECKBOXA 
         czy_mosty = st.session_state.get("mosty_key", False)
         
-        # SUWAK WODY: Parametr 'disabled' blokuje go, gdy czy_mosty == True
         bufor_wody = st.slider("Bufor od wód powierzchniowych (m)", 0, 200, 50, disabled=czy_mosty)
         
         st.subheader("Koszty 3D")
@@ -110,7 +109,6 @@ if st.session_state['aktualna_strona'] == 'Glowna':
         st.markdown("**Opcje zaawansowane**")
         wycinka_lasow = st.checkbox("Zezwalaj na wycinkę lasów")
         
-        # CHECKBOX: Dodajemy 'key', żeby Streamlit zapamiętał jego kliknięcie
         budowa_mostow = st.checkbox("Uwzględnij budowę mostów", key="mosty_key")
    
     run_analysis = st.button("Uruchom analizę przestrzenną", use_container_width=True)
@@ -144,13 +142,13 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             macierz_spadkow = terrain_3d.calculate_slope(macierz_wysokosci, cell_size=1.0)
                                             mapa_kosztow_3d = terrain_3d.score_topography(macierz_spadkow, optimal_slope=2.0, max_slope=spadek_max)
                                             
-                                            st.success("Analiza wysokościowa (3D) zakończona pomyślnie!")
+                                            st.success("Analiza wysokościowa zakończona pomyślnie!")
                                             
                                             
-                                            st.write("**Poniżej znajduje się wygenerowana mapa wyników (Zintegrowana 2D + 3D):**")
+                                            st.write("**Poniżej znajduje się wygenerowana mapa wyników:**")
                                             
                                             
-                                            # GŁÓWNA MAPA (Bez toru)
+                                            # GŁÓWNA MAPA 
                                             
                                             fig, ax = plt.subplots(figsize=(8, 6))
                                             show(mapa_kosztow_3d, transform=raster_transform, ax=ax, cmap='RdYlGn', title="Znalezione lokalizacje dla Toru F1")
@@ -168,14 +166,11 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             ax.set_ylim(min(lewy_gorny_y, prawy_dolny_y), max(lewy_gorny_y, prawy_dolny_y))
                                             ax.axis('off') 
                                             
-                                            
-                                            
-                                            
-                                            # NOWOŚĆ: DRUGA MAPA - GENEROWANIE TORU 
+                                            # DRUGA MAPA - GENEROWANIE TORU 
                                             
                                             st.markdown("---")
-                                            st.write("🏎️ **Wyznaczanie optymalnej pętli toru...**")
-                                            with st.spinner("Algorytm AI szuka najlepszej ścieżki (to może chwilę potrwać)..."):
+                                            st.write("**Wyznaczanie optymalnej pętli toru...**")
+                                            with st.spinner("Algorytm AI szuka najlepszej ścieżki..."):
                                                 
                                                 # 1. Rasteryzacja masek 2D
                                                 if hasattr(maska, 'geometry'):
@@ -202,19 +197,19 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             track_path, statystyki_toru = pathfinder.generate_track_loop(cost_matrix, num_waypoints=4)
                                             
                                             
-                                            # NOWOŚĆ: WYŚWIETLANIE MAP OBOK SIEBIE (KOLUMNY)
+                                            # WYŚWIETLANIE MAP 
                                             
                                             st.markdown("---")
                                             col_mapa1, col_mapa2 = st.columns(2)
                                             
                                             with col_mapa1:
-                                                st.write("🗺️ **Mapa przydatności terenu (2D + 3D)**")
+                                                st.write("**Mapa przydatności terenu (2D + 3D)**")
                                                 # WYŚWIETLAMY PIERWSZĄ MAPĘ DOPIERO TUTAJ
                                                 
                                                 st.pyplot(fig, use_container_width=True)
 
                                             with col_mapa2:
-                                                st.write("🏎️ **Zaprojektowany Tor F1**")
+                                                st.write("**Zaprojektowany Tor F1**")
                                                 
                                                 fig2, ax2 = plt.subplots(figsize=(8, 6))
                                                 show(mapa_kosztow_3d, transform=raster_transform, ax=ax2, cmap='RdYlGn', title="Zaprojektowany Tor F1")
@@ -256,7 +251,7 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             # 3 MAPKI CZESCIOWE
                                             
                                             st.markdown("---")
-                                            st.subheader("Analiza 3D krok po kroku (Podgląd modelu)")
+                                            st.subheader("Analiza 3D krok po kroku")
                                             st.write("Poniżej przedstawiono surowe etapy przetwarzania modelu Numerycznego Modelu Terenu:")
                                             
                                             fig_szczegoly, axes = plt.subplots(1, 3, figsize=(16, 5))
@@ -307,15 +302,15 @@ elif st.session_state['aktualna_strona'] == 'Opis':
     st.markdown("---")
     st.markdown("""
     ### Cel projektu
-    Nasza aplikacja służy do wyznaczania optymalnych lokalizacji dla nowych torów Formuły 1 na podstawie danych przestrzennych (GIS). 
+    Nasza aplikacja służy do wyznaczania optymalnych lokalizacji dla nowych torów Formuły 1 na podstawie danych przestrzennych. 
     
-    ### Analiza 2D (Twarde wykluczenia)
+    ### Analiza 2D 
     Używamy bazy BDOT10k do odrzucenia terenów, na których budowa jest niemożliwa lub nieopłacalna. 
     * **Budynki mieszkalne:** Tworzymy strefy buforowe, aby uniknąć hałasu.
     * **Wody powierzchniowe:** Omijamy rzeki i jeziora, aby zminimalizować koszty inżynieryjne.
     
-    ### Analiza 3D (Modelowanie spadków terenu)
-    Na podstawie Numerycznego Modelu Terenu (NMT) generujemy mapę spadków (Slope). 
+    ### Analiza 3D 
+    Na podstawie Numerycznego Modelu Terenu generujemy mapę spadków. 
     * Upewniamy się, że maksymalne nachylenie toru nie przekracza dopuszczalnych norm wyścigowych.
     """)
 

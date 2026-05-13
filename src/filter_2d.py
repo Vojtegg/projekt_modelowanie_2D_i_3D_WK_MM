@@ -4,9 +4,7 @@ import streamlit as st
 import re 
 
 def wygeneruj_maske_wykluczen(bdot_slownik, clc_gdf, buf_bud, buf_rek, buf_woda, wycinka_lasow, budowa_mostow):
-    """
-    Funkcja przyjmuje słownik z gotowymi warstwami BDOT i maskuje zakazane obszary.
-    """
+    
     lista_wykluczen = []
 
     # 1. ANALIZA BDOT10k 
@@ -37,15 +35,11 @@ def wygeneruj_maske_wykluczen(bdot_slownik, clc_gdf, buf_bud, buf_rek, buf_woda,
                     break
             
             if kolumna_nawierzchni:
-                # ODWRÓCONA LOGIKA: Zostawiamy w spokoju TYLKO drogi, które mają w nazwie 
-                # 'bitum' (masa bitumiczna to asfalt), 'beton' lub 'kostk' (kostka). 
-                # Cała reszta (żwir, grunt, tłuczeń) znika z radaru przeszkód
+                
                 twarde_drogi = jezdnie[jezdnie[kolumna_nawierzchni].astype(str).str.contains('bitum|beton|kostk', case=False, na=False, regex=True)]
             else:
-                # Jak nie wiemy co to za droga, to jej nie blokujemy
                 twarde_drogi = gpd.GeoDataFrame(geometry=[], crs=jezdnie.crs) 
                 
-            # Nakładamy bufor tylko na ten prawdziwy, twardy asfalt/kostkę
             if not twarde_drogi.empty:
                 lista_wykluczen.append(twarde_drogi.geometry.buffer(10).unary_union)
             

@@ -67,7 +67,7 @@ def wczytaj_raster_z_uploadu(uploaded_files):
         for fp in raster_paths:
             src_files_to_mosaic.append(rasterio.open(fp))
 
-        # ŁATKA: Wymuszamy, aby dziury między mapami były "brakiem danych", a nie wys. 0m
+        # Wymuszamy, aby dziury między mapami były "brakiem danych", a nie wys. 0m
         nodata = src_files_to_mosaic[0].nodata
         merge_nodata = nodata if nodata is not None else -9999.0
 
