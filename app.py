@@ -135,7 +135,7 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                             st.success("Analiza 2D zakończona pomyślnie!")
                             
                             if nmt_file: 
-                                with st.spinner("Łączenie kafelków NMT i obliczanie spadków..."):
+                                with st.spinner("Obliczanie spadków (NMT)..."):
                                     try:
                                         macierz_wysokosci, raster_transform, raster_crs = data_loader.wczytaj_raster_z_uploadu(nmt_file)
                                         if macierz_wysokosci is not None:
