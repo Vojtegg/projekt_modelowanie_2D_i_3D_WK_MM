@@ -39,7 +39,7 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
         angle = (2 * np.pi * i / num_waypoints) + offset_kata
         
         # ZMNIEJSZONY ROZRZUT (0.3 do 0.7), żeby nie bić w naszą nową "betonową ścianę"
-        losowy_radius = maksymalny_bezpieczny_promien * np.random.uniform(0.3, 0.7)
+        losowy_radius = maksymalny_bezpieczny_promien * np.random.uniform(0.6, 1.2)
         
         # Wyliczamy pozycję X i Y z uwzględnieniem przesuniętego środka
         y = int((center_y + przesuniecie_y) + losowy_radius * np.sin(angle))
@@ -106,11 +106,17 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
 
     dlugosc_km = round(dlugosc_calkowita / 1000, 2)
     
+    MINIMALNA_DLUGOSC = 3.0  # Ustawiamy absolutne minimum na 3.0 km
+    
+    if dlugosc_km < MINIMALNA_DLUGOSC:
+        print(f"Pathfinder: Tor zbyt krótki ({dlugosc_km} km). Wymagane minimum to {MINIMALNA_DLUGOSC} km. Odrzucam projekt.")
+        return None, None
+    
     statystyki_toru = {
         "dlugosc_km": dlugosc_km,
         "ilosc_pikseli": len(full_path)
     }
     
-    print(f"Pathfinder: Trasa wygenerowana ({dlugosc_km} km)!")
+    print(f"Pathfinder: Sukces! Trasa wygenerowana ({dlugosc_km} km)!")
     
     return np.array(full_path), statystyki_toru

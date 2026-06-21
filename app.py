@@ -211,30 +211,33 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             with col_mapa2:
                                                 st.write("**Zaprojektowany Tor F1**")
                                                 
-                                                fig2, ax2 = plt.subplots(figsize=(8, 6))
-                                                show(mapa_kosztow_3d, transform=raster_transform, ax=ax2, cmap='RdYlGn', title="Zaprojektowany Tor F1")
-                                                
-                                                if hasattr(maska, 'empty') and not maska.empty:
-                                                    maska.plot(ax=ax2, color='black', alpha=0.5, edgecolor='red', hatch='///')
-                                                elif hasattr(maska, 'is_empty') and not maska.is_empty:
-                                                    gpd.GeoSeries([maska]).plot(ax=ax2, color='black', alpha=0.5, edgecolor='red', hatch='///')
-                                                    
-                                                # Rysowanie wyznaczonego toru
+                                                # SPRAWDZAMY CZY TOR ISTNIEJE PRZED RYSOWANIEM MAPY
                                                 if track_path is not None:
+                                                    fig2, ax2 = plt.subplots(figsize=(8, 6))
+                                                    show(mapa_kosztow_3d, transform=raster_transform, ax=ax2, cmap='RdYlGn', title="Zaprojektowany Tor F1")
+                                                    
+                                                    if hasattr(maska, 'empty') and not maska.empty:
+                                                        maska.plot(ax=ax2, color='black', alpha=0.5, edgecolor='red', hatch='///')
+                                                    elif hasattr(maska, 'is_empty') and not maska.is_empty:
+                                                        gpd.GeoSeries([maska]).plot(ax=ax2, color='black', alpha=0.5, edgecolor='red', hatch='///')
+                                                    
+                                                    # Rysowanie wyznaczonego toru
                                                     xs, ys = rasterio.transform.xy(raster_transform, track_path[:, 0], track_path[:, 1])
                                                     ax2.plot(xs, ys, color='blue', linewidth=4, linestyle='-', label="Trasa")
                                                     ax2.legend()
                                                     
-                                                ax2.set_xlim(min(lewy_gorny_x, prawy_dolny_x), max(lewy_gorny_x, prawy_dolny_x))
-                                                ax2.set_ylim(min(lewy_gorny_y, prawy_dolny_y), max(lewy_gorny_y, prawy_dolny_y))
-                                                ax2.axis('off')
-                                                
-                                                # Wyświetlenie drugiej mapy
-                                                st.pyplot(fig2, use_container_width=True)
+                                                    ax2.set_xlim(min(lewy_gorny_x, prawy_dolny_x), max(lewy_gorny_x, prawy_dolny_x))
+                                                    ax2.set_ylim(min(lewy_gorny_y, prawy_dolny_y), max(lewy_gorny_y, prawy_dolny_y))
+                                                    ax2.axis('off')
+                                                    
+                                                    # Wyświetlenie drugiej mapy TYLKO gdy jest tor
+                                                    st.pyplot(fig2, use_container_width=True)
+                                                else:
+                                                    # WYŚWIETLENIE BŁĘDU ZAMIAST MAPY
+                                                    st.error("**Analiza nie powiodła się.**\n\nAlgorytm nie znalazł miejsca na zamkniętą pętlę spełniającą minimalne kryteria długości. Może to oznaczać zbyt duże zagęszczenie przeszkód na wybranym fragmencie mapy.\n\n**Wskazówka:** Spróbuj zmniejszyć bufory wykluczeń lub wgrać inny fragment terenu.")
 
                                             
-                                            # STATYSTYKI POD MAPAMI
-                                            
+                                            # STATYSTYKI POD MAPAMI (Wyświetlamy tylko, gdy jest sukces)
                                             if track_path is not None:
                                                 st.success("Algorytm optymalizacyjny pomyślnie zamknął pętlę!")
                                                 st.markdown("### Statystyki wygenerowanego toru:")
@@ -244,9 +247,6 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                                     st.metric(label="Szacowana długość", value=f"{statystyki_toru['dlugosc_km']} km")
                                                 with colB:
                                                     st.metric(label="Rozmiar trasy w siatce", value=f"{statystyki_toru['ilosc_pikseli']} pikseli")
-                                            else:
-                                                st.error("Algorytm nie znalazł miejsca na zamkniętą pętlę (zbyt dużo przeszkód).")
-
                                             
                                             # 3 MAPKI CZESCIOWE
                                             
