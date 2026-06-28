@@ -4,7 +4,6 @@ def calculate_slope(elevation_matrix, cell_size=1.0):
     
     print("Silnik 3D: Obliczam gradienty terenu (spadki)...")
     
-    # gradient() liczy różnice wysokości w pionie (dy) i poziomie (dx)
     dy, dx = np.gradient(elevation_matrix, cell_size, cell_size)
     
     # Obliczanie wektora spadku (Twierdzenie Pitagorasa)
@@ -18,7 +17,6 @@ def score_topography(slope_matrix, optimal_slope=2.0, max_slope=8.0):
     
     print(f"Silnik 3D: Oceniam przydatność (Optymalnie < {optimal_slope}%, Maksimum {max_slope}%)...")
     
-    # Tworzymy pustą macierz wypełnioną zerami
     score_matrix = np.zeros_like(slope_matrix)
     
     # 1. Tereny idealne 

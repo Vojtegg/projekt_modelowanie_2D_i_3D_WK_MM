@@ -22,10 +22,6 @@ def load_elevation_data(file_path):
     return elevation_matrix, metadata
 
 def wczytaj_raster_z_uploadu(uploaded_files):
-    """
-    Automatycznie łączy (mozaikuje) wiele kafelków NMT.
-    Działa ZARÓWNO z paczkami ZIP, jak i luzem rzuconymi plikami .asc / .tif
-    """
     if not uploaded_files:
         return None, None, None
         
@@ -37,7 +33,6 @@ def wczytaj_raster_z_uploadu(uploaded_files):
     raster_paths = []
     
     try:
-        # 1. Zapisujemy wgrane pliki (.asc lub .zip) do folderu tymczasowego
         for uploaded_file in uploaded_files:
             nazwa_pliku = uploaded_file.name
             temp_file_path = os.path.join(temp_dir, nazwa_pliku)
@@ -45,14 +40,12 @@ def wczytaj_raster_z_uploadu(uploaded_files):
             with open(temp_file_path, "wb") as f:
                 f.write(uploaded_file.getvalue())
 
-            # Jeśli to ZIP, rozpakowujemy i wywalamy paczkę. Jeśli to .asc - zostaje.
             if nazwa_pliku.lower().endswith('.zip'):
                 extract_dir = os.path.join(temp_dir, nazwa_pliku + "_unzipped")
                 with zipfile.ZipFile(temp_file_path, 'r') as zip_ref:
                     zip_ref.extractall(extract_dir)
                 os.remove(temp_file_path) 
         
-        # 2. Przeczesujemy foldery w poszukiwaniu .asc lub .tif
         for root, dirs, files in os.walk(temp_dir):
             for file in files:
                 if file.lower().endswith(('.tif', '.tiff', '.asc')):

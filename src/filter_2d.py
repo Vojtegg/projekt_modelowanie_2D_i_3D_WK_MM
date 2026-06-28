@@ -27,7 +27,6 @@ def wygeneruj_maske_wykluczen(bdot_slownik, clc_gdf, buf_bud, buf_rek, buf_woda,
         if bdot_slownik['jezdnie'] is not None and not bdot_slownik['jezdnie'].empty:
             jezdnie = bdot_slownik['jezdnie']
             
-            # Szukamy kolumny
             kolumna_nawierzchni = None
             for col in jezdnie.columns:
                 if 'naw' in col.lower() or 'rodz' in col.lower() or 'typ' in col.lower():

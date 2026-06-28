@@ -13,14 +13,12 @@ from src import terrain_3d
 from src import filter_2d
 from src import pathfinder
 
-
 # KONFIGURACJA APLIKACJI 
 
 st.set_page_config(page_title="Generator Torów F1", layout="wide")
 
 if 'aktualna_strona' not in st.session_state:
     st.session_state['aktualna_strona'] = 'Glowna'
-
 
 # PASEK BOCZNY 
 
@@ -98,7 +96,7 @@ if st.session_state['aktualna_strona'] == 'Glowna':
         bufor_budynki = st.slider("Bufor od budynków mieszkalnych (m)", 0, 500, 100)
         bufor_rekreacja = st.slider("Bufor od terenów rekreacyjnych (m)", 0, 300, 50)
         
-        # SPRAWDZAMY STAN CHECKBOXA 
+
         czy_mosty = st.session_state.get("mosty_key", False)
         
         bufor_wody = st.slider("Bufor od wód powierzchniowych (m)", 0, 200, 50, disabled=czy_mosty)
@@ -172,7 +170,6 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             st.write("**Wyznaczanie optymalnej pętli toru...**")
                                             with st.spinner("Algorytm AI szuka najlepszej ścieżki..."):
                                                 
-                                                # 1. Rasteryzacja masek 2D
                                                 if hasattr(maska, 'geometry'):
                                                     geometrie = [(geom, 1) for geom in maska.geometry]
                                                 else:
@@ -185,17 +182,13 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                                     fill=0,
                                                     dtype='uint8'
                                                 )
-
-                                                # 2. Tworzenie macierzy kosztów
                                                 
                                                 cost_matrix = 5000.0 - (mapa_kosztow_3d * 4999.0)
 
                                                 
                                                 cost_matrix[maska_raster == 1] = 9999999.0
                                                 
-                                                # 3. Wywołanie silnika
                                             track_path, statystyki_toru = pathfinder.generate_track_loop(cost_matrix, num_waypoints=4)
-                                            
                                             
                                             # WYŚWIETLANIE MAP 
                                             
@@ -204,14 +197,12 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                             
                                             with col_mapa1:
                                                 st.write("**Mapa przydatności terenu (2D + 3D)**")
-                                                # WYŚWIETLAMY PIERWSZĄ MAPĘ DOPIERO TUTAJ
                                                 
                                                 st.pyplot(fig, use_container_width=True)
 
                                             with col_mapa2:
                                                 st.write("**Zaprojektowany Tor F1**")
                                                 
-                                                # SPRAWDZAMY CZY TOR ISTNIEJE PRZED RYSOWANIEM MAPY
                                                 if track_path is not None:
                                                     fig2, ax2 = plt.subplots(figsize=(8, 6))
                                                     show(mapa_kosztow_3d, transform=raster_transform, ax=ax2, cmap='RdYlGn', title="Zaprojektowany Tor F1")
@@ -230,14 +221,12 @@ if st.session_state['aktualna_strona'] == 'Glowna':
                                                     ax2.set_ylim(min(lewy_gorny_y, prawy_dolny_y), max(lewy_gorny_y, prawy_dolny_y))
                                                     ax2.axis('off')
                                                     
-                                                    # Wyświetlenie drugiej mapy TYLKO gdy jest tor
                                                     st.pyplot(fig2, use_container_width=True)
                                                 else:
-                                                    # WYŚWIETLENIE BŁĘDU ZAMIAST MAPY
                                                     st.error("**Analiza nie powiodła się.**\n\nAlgorytm nie znalazł miejsca na zamkniętą pętlę spełniającą minimalne kryteria długości. Może to oznaczać zbyt duże zagęszczenie przeszkód na wybranym fragmencie mapy.\n\n**Wskazówka:** Spróbuj zmniejszyć bufory wykluczeń lub wgrać inny fragment terenu.")
 
                                             
-                                            # STATYSTYKI POD MAPAMI (Wyświetlamy tylko, gdy jest sukces)
+                                            # STATYSTYKI POD MAPAMI
                                             if track_path is not None:
                                                 st.success("Algorytm optymalizacyjny pomyślnie zamknął pętlę!")
                                                 st.markdown("### Statystyki wygenerowanego toru:")

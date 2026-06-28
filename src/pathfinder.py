@@ -12,8 +12,6 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
     bezpieczna_macierz = np.where(np.isinf(cost_matrix), 99999, cost_matrix)
     wysokosc, szerokosc = bezpieczna_macierz.shape
     
-    # NAPRAWA 3: Niewidzialna ściana wokół mapy (Zakaz ucieczek)
-    
     grubosc_ramki = 20
     bezpieczna_macierz[:grubosc_ramki, :] = 99999
     bezpieczna_macierz[-grubosc_ramki:, :] = 99999
@@ -27,10 +25,10 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
     maksymalny_bezpieczny_promien = dystans_do_przeszkod[center_y, center_x]
     waypoints = []
     
-    # Losowy obrót "szkieletu" toru o dowolny kąt (0 - 360 stopni)
+    # Losowy obrót "szkieletu" toru o dowolny kąt 0 - 360 stopni
     offset_kata = np.random.uniform(0, 2 * np.pi) 
     
-    # Lekko przesuwamy sam środek ciężkości (do 20% maksymalnego promienia)
+    # Lekko przesuwamy sam środek ciężkości do 20% maksymalnego promienia
     przesuniecie_y = int(maksymalny_bezpieczny_promien * np.random.uniform(-0.2, 0.2))
     przesuniecie_x = int(maksymalny_bezpieczny_promien * np.random.uniform(-0.2, 0.2))
     
@@ -38,15 +36,12 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
         # Każdy waypoint otrzymuje swój własny, lekko przesunięty kąt
         angle = (2 * np.pi * i / num_waypoints) + offset_kata
         
-        # ZMNIEJSZONY ROZRZUT (0.3 do 0.7), żeby nie bić w naszą nową "betonową ścianę"
         losowy_radius = maksymalny_bezpieczny_promien * np.random.uniform(0.6, 1.2)
         
         # Wyliczamy pozycję X i Y z uwzględnieniem przesuniętego środka
         y = int((center_y + przesuniecie_y) + losowy_radius * np.sin(angle))
         x = int((center_x + przesuniecie_x) + losowy_radius * np.cos(angle))
-        
-        # NAPRAWA 4: Margines (Odrywamy punkty od zera!)
-        
+         
         margines = 25
         y = int(np.clip(y, margines, wysokosc - margines - 1))
         x = int(np.clip(x, margines, szerokosc - margines - 1))
@@ -70,7 +65,6 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
     waypoints.append(waypoints[0])
     full_path = []
 
-    # Tworzymy kopię macierzy do dynamicznego nakładania kar
     dynamiczna_macierz_kosztow = bezpieczna_macierz.copy()
 
     for i in range(len(waypoints) - 1):
@@ -78,11 +72,10 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
         end = waypoints[i+1]
 
         try:
-            # Używamy DYNAMICZNEJ macierzy, która z każdym krokiem ma nowe przeszkody
+            # Używamy dynamicznej macierzy, która z każdym krokiem ma nowe przeszkody
             path, cost = route_through_array(dynamiczna_macierz_kosztow, start, end, fully_connected=True)
             full_path.extend(path[:-1]) 
             
-            # Wylewamy "wirtualny beton" na właśnie wyrysowaną ścieżkę
             for py, px in path:
                 dynamiczna_macierz_kosztow[py, px] += 50000 
                 
@@ -92,7 +85,7 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
 
     full_path.append(waypoints[-1])
     
-    # Przygotowujemy statystyki do zwrotu
+    # Statystyki do zwrotu
     ROZDZIELCZOSC_METRY = 1.0  
     dlugosc_calkowita = 0.0
     
@@ -106,7 +99,7 @@ def generate_track_loop(cost_matrix, num_waypoints=4):
 
     dlugosc_km = round(dlugosc_calkowita / 1000, 2)
     
-    MINIMALNA_DLUGOSC = 3.0  # Ustawiamy absolutne minimum na 3.0 km
+    MINIMALNA_DLUGOSC = 3.0
     
     if dlugosc_km < MINIMALNA_DLUGOSC:
         print(f"Pathfinder: Tor zbyt krótki ({dlugosc_km} km). Wymagane minimum to {MINIMALNA_DLUGOSC} km. Odrzucam projekt.")
